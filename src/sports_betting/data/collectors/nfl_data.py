@@ -260,9 +260,9 @@ class NFLDataCollector:
     def _store_injury_report(self, session: Session, injury_row: pd.Series) -> bool:
         """Store a single injury report record."""
         try:
-            # Find player by external_id
+            # Find player by external_id (gsis_id in nfl-data-py)
             player = session.query(Player).filter_by(
-                external_id=injury_row['player_id']
+                external_id=injury_row['gsis_id']
             ).first()
 
             if not player:
@@ -274,12 +274,28 @@ class NFLDataCollector:
             if not player:
                 return False
 
-            # Parse report date
-            report_date = pd.to_datetime(injury_row['report_date']) if pd.notna(injury_row.get('report_date')) else datetime.utcnow()
+            # Parse report date (date_modified in nfl-data-py)
+            report_date = pd.to_datetime(injury_row['date_modified']) if pd.notna(injury_row.get('date_modified')) else datetime.utcnow()
 
-            # Get season and week from row or derive from report_date
-            season = int(injury_row['season']) if 'season' in injury_row and pd.notna(injury_row['season']) else report_date.year
-            week = int(injury_row['week']) if 'week' in injury_row and pd.notna(injury_row['week']) else 1
+            # Get season and week from row
+            season = int(injury_row['season'])
+            week = int(injury_row['week'])
+
+            # Parse practice status
+            practice_status = injury_row.get('practice_status', '')
+            if pd.isna(practice_status):
+                practice_status = ''
+
+            # Map practice status to simplified format
+            # nfl-data-py uses: "Full Participation", "Limited Participation", "Did Not Participate"
+            if 'Full' in practice_status:
+                practice_participation = 'Full'
+            elif 'Limited' in practice_status:
+                practice_participation = 'Limited'
+            elif 'Did Not Participate' in practice_status or 'DNP' in practice_status:
+                practice_participation = 'DNP'
+            else:
+                practice_participation = None
 
             # Check if injury report already exists for this player/season/week
             existing_report = session.query(InjuryReport).filter_by(
@@ -288,15 +304,28 @@ class NFLDataCollector:
                 week=week
             ).first()
 
+            # Handle injury_status - must not be None
+            injury_status = injury_row.get('report_status')
+            if pd.isna(injury_status) or injury_status is None:
+                injury_status = 'Injured'  # Default for records without status
+
+            # Handle injury fields that might be NaN
+            primary_injury = injury_row.get('report_primary_injury')
+            if pd.isna(primary_injury):
+                primary_injury = None
+
+            secondary_injury = injury_row.get('report_secondary_injury')
+            if pd.isna(secondary_injury):
+                secondary_injury = None
+
             if existing_report:
                 # Update existing report
-                existing_report.injury_status = injury_row.get('report_status', 'Unknown')
-                existing_report.primary_injury = injury_row.get('report_primary_injury')
-                existing_report.secondary_injury = injury_row.get('report_secondary_injury')
+                existing_report.injury_status = injury_status
+                existing_report.primary_injury = primary_injury
+                existing_report.secondary_injury = secondary_injury
                 existing_report.report_date = report_date
-                existing_report.practice_wednesday = injury_row.get('practice_wednesday')
-                existing_report.practice_thursday = injury_row.get('practice_thursday')
-                existing_report.practice_friday = injury_row.get('practice_friday')
+                # Store practice status in the Friday field (most recent)
+                existing_report.practice_friday = practice_participation
                 existing_report.is_active_report = True
                 return False
 
@@ -306,13 +335,11 @@ class NFLDataCollector:
                 report_date=report_date,
                 season=season,
                 week=week,
-                injury_status=injury_row.get('report_status', 'Unknown'),
-                primary_injury=injury_row.get('report_primary_injury'),
-                secondary_injury=injury_row.get('report_secondary_injury'),
-                practice_wednesday=injury_row.get('practice_wednesday'),
-                practice_thursday=injury_row.get('practice_thursday'),
-                practice_friday=injury_row.get('practice_friday'),
-                date_of_injury=pd.to_datetime(injury_row['date_of_injury']) if 'date_of_injury' in injury_row and pd.notna(injury_row.get('date_of_injury')) else None,
+                injury_status=injury_status,
+                primary_injury=primary_injury,
+                secondary_injury=secondary_injury,
+                # Store practice status in the Friday field (most recent)
+                practice_friday=practice_participation,
                 is_active_report=True,
             )
 

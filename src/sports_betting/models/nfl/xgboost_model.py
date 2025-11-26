@@ -39,9 +39,12 @@ class XGBoostPropsModel(BasePredictor):
     def prepare_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Prepare features for XGBoost training/prediction."""
         logger.info(f"Preparing features for {self.prop_type} predictions")
-        
+
         # Create rolling averages for key stats
         feature_df = df.copy()
+
+        # Reset index to avoid duplicate index issues
+        feature_df = feature_df.reset_index(drop=True)
         
         # Player-level rolling stats (last 4 games)
         player_stats = ['receiving_yards', 'receiving_tds', 'targets', 'receptions', 
@@ -65,29 +68,34 @@ class XGBoostPropsModel(BasePredictor):
                     .reset_index([0, 1], drop=True)
                 )
         
-        # Team-level features
+        # Team-level features (if available)
         team_stats = ['points_scored', 'points_allowed', 'total_yards', 'passing_yards_allowed']
         for stat in team_stats:
             if stat in feature_df.columns:
-                feature_df[f'team_{stat}_4game_avg'] = (
-                    feature_df.groupby('team')[stat]
-                    .rolling(window=4, min_periods=1)
+                try:
+                    feature_df[f'team_{stat}_4game_avg'] = (
+                        feature_df.groupby('team')[stat]
+                        .rolling(window=4, min_periods=1)
+                        .mean()
+                        .reset_index(0, drop=True)
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not create team stat {stat}: {e}")
+
+        # Opponent strength features (if available)
+        if 'opponent' in feature_df.columns and 'points_allowed' in feature_df.columns:
+            try:
+                opp_def_rank = (
+                    feature_df.groupby(['opponent', 'season'])['points_allowed']
                     .mean()
-                    .reset_index(0, drop=True)
+                    .rank(ascending=True)
+                    .to_dict()
                 )
-        
-        # Opponent strength features
-        if 'opponent' in feature_df.columns:
-            # Opponent's defensive ranking (points allowed)
-            opp_def_rank = (
-                feature_df.groupby(['opponent', 'season'])['points_allowed']
-                .mean()
-                .rank(ascending=True)
-                .to_dict()
-            )
-            feature_df['opp_def_rank'] = feature_df.apply(
-                lambda x: opp_def_rank.get((x['opponent'], x['season']), 16), axis=1
-            )
+                feature_df['opp_def_rank'] = feature_df.apply(
+                    lambda x: opp_def_rank.get((x['opponent'], x['season']), 16), axis=1
+                )
+            except Exception as e:
+                logger.warning(f"Could not create opponent ranking: {e}")
         
         # Game context features
         if 'game_date' in feature_df.columns:
@@ -219,10 +227,14 @@ class XGBoostPropsModel(BasePredictor):
         if hasattr(self.model, 'feature_importances_'):
             # Simple confidence based on prediction value and model uncertainty
             prediction_std = np.std(predictions)
-            results[f'{self.prop_type}_confidence'] = np.clip(
-                1.0 - (np.abs(predictions - predictions.mean()) / (2 * prediction_std)),
-                0.1, 0.9
-            )
+            if prediction_std > 0:
+                results[f'{self.prop_type}_confidence'] = np.clip(
+                    1.0 - (np.abs(predictions - predictions.mean()) / (2 * prediction_std)),
+                    0.1, 0.9
+                )
+            else:
+                # Single prediction or all predictions identical
+                results[f'{self.prop_type}_confidence'] = 0.7  # Default confidence
         else:
             results[f'{self.prop_type}_confidence'] = 0.7  # Default confidence
             

@@ -77,3 +77,8 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Project planning
+roadmap.md
+*.md
+!README.md

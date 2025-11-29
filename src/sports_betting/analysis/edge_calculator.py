@@ -186,7 +186,7 @@ class EdgeCalculator:
                         player = session.query(Player).get(prop.player_id)
 
                         edge_info = {
-                            'game': f"{game.away_team} @ {game.home_team}",
+                            'game': f"{game.away_team.abbreviation} @ {game.home_team.abbreviation}",
                             'game_date': game.game_date,
                             'player': player.name,
                             'position': player.position,

@@ -38,22 +38,22 @@ venv.bak/
 *.swo
 *~
 
-# Data and outputs (root level only, not source code)
-/data/
-/outputs/
-/logs/
-*.db
+# Data and outputs
+data/*.db
+data/*.csv
+data/historical/
+outputs/
+logs/
 
-# Models (root level trained models, not source code)
-/models/
-*.pkl
-*.joblib
-*.pt
-*.pth
+# Models (trained model artifacts)
+models/*.pkl
+models/*.joblib
+models/*.pt
+models/*.pth
+models/enhanced/
 
-# Output files
-*.csv
-*.json
+# Cache directories
+.sports_betting/
 
 # Jupyter
 .ipynb_checkpoints
@@ -78,7 +78,6 @@ htmlcov/
 .dmypy.json
 dmypy.json
 
-# Project planning
-roadmap.md
-*.md
-!README.md
+# Keep docs tracked (don't ignore markdown in docs/)
+# Only ignore root-level temp markdown files
+/TEMP_*.md

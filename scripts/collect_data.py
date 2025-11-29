@@ -1,7 +1,15 @@
 """Script to collect NFL data for 2024 season."""
 
 import sys
+from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Add src directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.sports_betting.data.collectors.nfl_data import NFLDataCollector
 
@@ -12,14 +20,19 @@ def main():
 
     collector = NFLDataCollector()
 
-    # 1. Collect 2024 schedule
-    print("\n[1/5] Collecting 2024 NFL schedule...")
-    games_count = collector.collect_schedule([2024])
+    # 0. Collect teams (required first!)
+    print("\n[0/5] Collecting NFL teams...")
+    teams_count = collector.collect_teams()
+    print(f"✓ Collected {teams_count} teams")
+
+    # 1. Collect 2024-2025 schedule
+    print("\n[1/5] Collecting 2024-2025 NFL schedule...")
+    games_count = collector.collect_schedule([2024, 2025])
     print(f"✓ Collected {games_count} games")
 
-    # 2. Collect 2024 rosters (current)
-    print("\n[2/5] Collecting 2024 NFL rosters...")
-    roster_count = collector.collect_rosters([2024])
+    # 2. Collect 2024-2025 rosters (current)
+    print("\n[2/5] Collecting 2024-2025 NFL rosters...")
+    roster_count = collector.collect_rosters([2024, 2025])
     print(f"✓ Collected {roster_count} player records")
 
     # 3. Collect 2024 injury reports
@@ -40,6 +53,7 @@ def main():
     print("\n" + "=" * 60)
     print("DATA COLLECTION COMPLETE!")
     print("=" * 60)
+    print(f"Teams:              {teams_count}")
     print(f"Games:              {games_count}")
     print(f"Players:            {roster_count}")
     print(f"Injury Reports:     {injury_count + historical_injuries}")

@@ -22,6 +22,40 @@ class NFLDataCollector:
         if datetime.now().month < 9:  # Before September
             self.current_season -= 1
 
+    def collect_teams(self) -> int:
+        """Collect and store NFL team data."""
+        teams_df = nfl.import_team_desc()
+        stored_count = 0
+
+        with get_session() as session:
+            for _, team_row in teams_df.iterrows():
+                # Check if team already exists
+                existing_team = session.query(Team).filter_by(
+                    abbreviation=team_row['team_abbr']
+                ).first()
+
+                if not existing_team:
+                    # Extract city and team name
+                    full_name = team_row['team_name']  # e.g., "Arizona Cardinals"
+                    nick_name = team_row['team_nick']  # e.g., "Cardinals"
+
+                    # City is everything before the nickname
+                    city = full_name.replace(nick_name, '').strip()
+
+                    team = Team(
+                        name=full_name,
+                        abbreviation=team_row['team_abbr'],
+                        city=city,
+                        conference=team_row['team_conf'],
+                        division=team_row['team_division']
+                    )
+                    session.add(team)
+                    stored_count += 1
+
+            session.commit()
+
+        return stored_count
+
     def collect_schedule(self, years: List[int] = None) -> int:
         """Collect and store NFL schedule data."""
         if years is None:

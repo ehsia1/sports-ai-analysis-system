@@ -1,6 +1,5 @@
 """Analysis and prediction modules."""
 
-from .fair_value import FairValueCalculator
-from .edge_detector import EdgeDetector
+from .edge_calculator import EdgeCalculator
 
-__all__ = ["FairValueCalculator", "EdgeDetector"]
+__all__ = ["EdgeCalculator"]

@@ -388,7 +388,62 @@ class DataCache(Base):
     last_updated: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     request_count: Mapped[int] = mapped_column(Integer, default=1)
     is_stale: Mapped[bool] = mapped_column(Boolean, default=False)
-    
+
     # Relationships
     game: Mapped[Optional["Game"]] = relationship("Game")
     player: Mapped[Optional["Player"]] = relationship("Player")
+
+
+class PaperTrade(Base):
+    """Paper trading (hypothetical bets) for system validation."""
+
+    __tablename__ = "paper_trades"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id"))
+    player_id: Mapped[int] = mapped_column(ForeignKey("players.id"))
+    prop_id: Mapped[Optional[int]] = mapped_column(ForeignKey("props.id"))
+
+    # Bet details
+    market: Mapped[str] = mapped_column(String(50), nullable=False)  # receiving_yards, etc.
+    bet_side: Mapped[str] = mapped_column(String(10), nullable=False)  # over, under
+    line: Mapped[float] = mapped_column(Float, nullable=False)
+    odds: Mapped[int] = mapped_column(Integer, nullable=False)  # American odds
+    stake: Mapped[float] = mapped_column(Float, default=100.0)  # Hypothetical stake
+
+    # Model analysis
+    model_prediction: Mapped[float] = mapped_column(Float, nullable=False)
+    model_confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    edge_percentage: Mapped[float] = mapped_column(Float, nullable=False)
+    expected_value: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Reasoning (JSON for flexibility)
+    reasoning: Mapped[dict] = mapped_column(JSON, nullable=False)
+    # Example reasoning structure:
+    # {
+    #   "primary_factor": "High edge (+5.2%)",
+    #   "player_form": "Hot streak - 3 games over 90 yards",
+    #   "target_share": "28.5% (team leader)",
+    #   "matchup": "vs 28th ranked pass defense",
+    #   "weather": "Dome game, no weather concerns",
+    #   "injury_status": "Healthy, full participant all week",
+    #   "recent_performance": "91.3 yard avg last 3 games",
+    #   "confidence_factors": ["Target share", "Recent form", "Matchup"],
+    #   "risk_factors": ["High line (84.5)", "Road game"]
+    # }
+
+    # Outcome tracking
+    actual_result: Mapped[Optional[float]] = mapped_column(Float)  # Actual yards
+    won: Mapped[Optional[bool]] = mapped_column(Boolean)
+    profit_loss: Mapped[Optional[float]] = mapped_column(Float)
+    evaluated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    # Metadata
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    tags: Mapped[Optional[str]] = mapped_column(String(200))  # Comma-separated tags
+
+    # Relationships
+    game: Mapped["Game"] = relationship("Game")
+    player: Mapped["Player"] = relationship("Player")
+    prop: Mapped[Optional["Prop"]] = relationship("Prop")

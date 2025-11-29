@@ -14,6 +14,42 @@ from ..database.models import Prop, Book, Player, Game
 logger = logging.getLogger(__name__)
 
 
+def american_to_decimal(american_odds: int) -> float:
+    """Convert American odds to decimal odds."""
+    if american_odds > 0:
+        return (american_odds / 100.0) + 1.0
+    else:
+        return (100.0 / abs(american_odds)) + 1.0
+
+
+def american_to_probability(american_odds: int) -> float:
+    """Convert American odds to implied probability (with vig)."""
+    if american_odds > 0:
+        return 100.0 / (american_odds + 100.0)
+    else:
+        return abs(american_odds) / (abs(american_odds) + 100.0)
+
+
+def remove_vig(over_prob: float, under_prob: float) -> tuple[float, float]:
+    """
+    Remove vig from probabilities to get fair probabilities.
+
+    Uses the margin-proportional method.
+    """
+    total = over_prob + under_prob
+    margin = total - 1.0
+
+    if margin <= 0:
+        # No vig or negative vig (shouldn't happen)
+        return over_prob, under_prob
+
+    # Remove margin proportionally
+    fair_over = over_prob / total
+    fair_under = under_prob / total
+
+    return fair_over, fair_under
+
+
 class OddsAPIClient:
     """Client for The Odds API with daily caching and credit tracking."""
 
@@ -80,33 +116,60 @@ class OddsAPIClient:
     def get_player_props(
         self,
         markets: Optional[List[str]] = None,
-        bookmakers: Optional[List[str]] = None
+        bookmakers: Optional[List[str]] = None,
+        event_ids: Optional[List[str]] = None
     ) -> Optional[Dict]:
         """
-        Get NFL player props odds.
+        Get NFL player props odds for all events or specific events.
 
-        Cost: number_of_markets × number_of_regions
-        Example: 4 markets × 1 region = 4 credits
+        Cost: number_of_markets × number_of_regions × number_of_events
+        Example: 1 market × 1 region × 10 events = 10 credits
         """
         if markets is None:
             markets = ["player_reception_yds"]  # Start with just receiving yards
 
-        params = {
-            "regions": self.regions,
-            "markets": ",".join(markets),
-            "oddsFormat": self.oddsFormat,
+        # If no specific events provided, get all upcoming NFL games
+        if event_ids is None:
+            events = self.get_nfl_games()
+            if not events:
+                logger.error("No upcoming NFL games found")
+                return None
+            event_ids = [event['id'] for event in events[:10]]  # Limit to first 10 to save credits
+            logger.info(f"Found {len(events)} games, fetching odds for first {len(event_ids)}")
+
+        # Aggregate all props from all events
+        all_props = []
+        total_cost = 0
+
+        for event_id in event_ids:
+            params = {
+                "regions": self.regions,
+                "markets": ",".join(markets),
+                "oddsFormat": self.oddsFormat,
+            }
+
+            if bookmakers:
+                params["bookmakers"] = ",".join(bookmakers)
+
+            logger.info(f"Fetching props for event {event_id}")
+
+            event_odds = self._make_request(
+                f"sports/americanfootball_nfl/events/{event_id}/odds",
+                params
+            )
+
+            if event_odds:
+                all_props.append(event_odds)
+                total_cost += int(self.last_request_cost or 0)
+
+        logger.info(f"Total props fetched: {len(all_props)} events")
+        logger.info(f"Total cost: {total_cost} credits")
+
+        return {
+            'data': all_props,
+            'events_count': len(all_props),
+            'total_cost': total_cost
         }
-
-        if bookmakers:
-            params["bookmakers"] = ",".join(bookmakers)
-
-        logger.info(f"Fetching player props for markets: {markets}")
-        logger.info(f"Expected cost: {len(markets)} credits")
-
-        return self._make_request(
-            "sports/americanfootball_nfl/odds",
-            params
-        )
 
     def get_cached_odds(self, date: Optional[datetime] = None) -> Optional[Dict]:
         """Get cached odds for a specific date."""
@@ -163,6 +226,7 @@ class OddsAPIClient:
     def fetch_and_cache_daily_odds(
         self,
         markets: Optional[List[str]] = None,
+        event_ids: Optional[List[str]] = None,
         force: bool = False
     ) -> Dict:
         """
@@ -170,6 +234,7 @@ class OddsAPIClient:
 
         Args:
             markets: List of markets to fetch
+            event_ids: Specific event IDs to fetch (limits API usage)
             force: Force fetch even if already cached today
 
         Returns:
@@ -180,11 +245,11 @@ class OddsAPIClient:
             return self.get_cached_odds()
 
         logger.info("Fetching fresh odds from API...")
-        odds_data = self.get_player_props(markets=markets)
+        odds_data = self.get_player_props(markets=markets, event_ids=event_ids)
 
         if odds_data:
             self.cache_odds(odds_data)
-            logger.info(f"Successfully cached odds. Credits used: {self.last_request_cost}")
+            logger.info(f"Successfully cached odds. Credits used: {odds_data.get('total_cost', 0)}")
             return odds_data
         else:
             logger.error("Failed to fetch odds from API")
@@ -216,14 +281,41 @@ class OddsAPIClient:
                 if 'bookmakers' not in event:
                     continue
 
-                # Find the game
-                game = session.query(Game).filter_by(
-                    external_id=event.get('id')
-                ).first()
+                # Find the game - try by external_id first, then by team names
+                game = None
 
+                # Try external_id
+                if event.get('id'):
+                    game = session.query(Game).filter_by(
+                        external_id=event.get('id')
+                    ).first()
+
+                # If not found, try matching by team names
                 if not game:
-                    logger.warning(f"Game not found for event {event.get('id')}")
-                    continue
+                    home_team_name = event.get('home_team')
+                    away_team_name = event.get('away_team')
+
+                    if home_team_name and away_team_name:
+                        # Find teams by name
+                        from ..database.models import Team
+
+                        home_team = session.query(Team).filter_by(name=home_team_name).first()
+                        away_team = session.query(Team).filter_by(name=away_team_name).first()
+
+                        if home_team and away_team:
+                            # Query game by team IDs
+                            game = session.query(Game).filter_by(
+                                home_team_id=home_team.id,
+                                away_team_id=away_team.id
+                            ).first()
+
+                        # If still not found, log warning
+                        if not game:
+                            logger.warning(
+                                f"Game not found for {away_team_name} @ {home_team_name}, "
+                                f"event ID: {event.get('id')}"
+                            )
+                            continue
 
                 # Process each bookmaker
                 for bookmaker_data in event['bookmakers']:
@@ -247,10 +339,37 @@ class OddsAPIClient:
                     # Process markets
                     for market in bookmaker_data.get('markets', []):
                         market_key = market['key']
+                        outcomes = market.get('outcomes', [])
 
-                        # Process each outcome (player)
-                        for outcome in market.get('outcomes', []):
-                            player_name = outcome['description']
+                        # Group outcomes by player and line (to pair over/under)
+                        player_lines = {}
+
+                        for outcome in outcomes:
+                            player_name = outcome.get('description')
+                            line = outcome.get('point')
+                            side = outcome.get('name', '').lower()  # 'over' or 'under'
+                            price = outcome.get('price')
+
+                            if not all([player_name, line is not None, side, price is not None]):
+                                continue
+
+                            # Create key to group over/under
+                            key = (player_name, line)
+
+                            if key not in player_lines:
+                                player_lines[key] = {'over': None, 'under': None}
+
+                            player_lines[key][side] = price
+
+                        # Now store each paired over/under as a single Prop
+                        for (player_name, line), odds in player_lines.items():
+                            # Skip if we don't have both sides
+                            if odds['over'] is None or odds['under'] is None:
+                                logger.debug(
+                                    f"Incomplete odds for {player_name} {line}: "
+                                    f"over={odds['over']}, under={odds['under']}"
+                                )
+                                continue
 
                             # Find player
                             player = session.query(Player).filter_by(
@@ -258,36 +377,44 @@ class OddsAPIClient:
                             ).first()
 
                             if not player:
-                                logger.debug(f"Player not found: {player_name}")
+                                logger.debug(f"Player not found in database: {player_name}")
                                 continue
 
-                            # Get line and odds
-                            line = outcome.get('point')
-                            price = outcome.get('price')
+                            # Calculate decimal prices and probabilities
+                            over_price = american_to_decimal(odds['over'])
+                            under_price = american_to_decimal(odds['under'])
 
-                            if line is None or price is None:
-                                continue
+                            # Calculate implied probabilities (with vig)
+                            over_prob_raw = american_to_probability(odds['over'])
+                            under_prob_raw = american_to_probability(odds['under'])
 
-                            # Determine over/under
-                            # The Odds API typically has separate outcomes for over/under
-                            # We'll need to pair them up
-                            # For now, store what we have
+                            # Remove vig to get fair probabilities
+                            over_probability, under_probability = remove_vig(
+                                over_prob_raw, under_prob_raw
+                            )
 
                             # Check if prop already exists for today
+                            today_start = datetime.now().replace(hour=0, minute=0, second=0)
                             existing = session.query(Prop).filter_by(
                                 game_id=game.id,
                                 player_id=player.id,
                                 book_id=book.id,
                                 market=market_key,
+                                line=line
                             ).filter(
-                                Prop.timestamp >= datetime.now().replace(hour=0, minute=0, second=0)
+                                Prop.timestamp >= today_start
                             ).first()
 
                             if existing:
                                 # Update existing
-                                existing.line = line
-                                existing.over_odds = price
+                                existing.over_odds = odds['over']
+                                existing.under_odds = odds['under']
+                                existing.over_price = over_price
+                                existing.under_price = under_price
+                                existing.over_probability = over_probability
+                                existing.under_probability = under_probability
                                 existing.timestamp = datetime.now()
+                                logger.debug(f"Updated prop for {player_name}")
                             else:
                                 # Create new prop
                                 prop = Prop(
@@ -296,11 +423,16 @@ class OddsAPIClient:
                                     book_id=book.id,
                                     market=market_key,
                                     line=line,
-                                    over_odds=price,
-                                    under_odds=-110,  # Default, will update when we find the under
+                                    over_odds=odds['over'],
+                                    under_odds=odds['under'],
+                                    over_price=over_price,
+                                    under_price=under_price,
+                                    over_probability=over_probability,
+                                    under_probability=under_probability,
                                     timestamp=datetime.now()
                                 )
                                 session.add(prop)
+                                logger.debug(f"Created prop for {player_name}")
 
                             stored_count += 1
 

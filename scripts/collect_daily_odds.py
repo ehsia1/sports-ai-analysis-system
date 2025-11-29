@@ -6,6 +6,10 @@ Run this once per day to fetch odds and calculate edges.
 """
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -45,18 +49,36 @@ def main():
     print("(This will use API credits)")
     print()
 
+    # Get upcoming games
+    events = client.get_nfl_games()
+    print(f"Found {len(events)} upcoming NFL games")
+    print()
+
+    # Limit to first 5 games to conserve credits
+    # Cost: 1 market × 1 region × 5 events = 5 credits
+    max_events = 5
+    event_ids = [e['id'] for e in events[:max_events]]
+
+    print(f"Fetching odds for {len(event_ids)} games (saves API credits)")
+    for i, event in enumerate(events[:max_events], 1):
+        print(f"  {i}. {event['away_team']} @ {event['home_team']}")
+    print()
+
     # Fetch odds for receiving yards only (most accurate model)
-    # Cost: 1 market × 1 region = 1 credit
     markets = ['player_reception_yds']
 
-    odds_data = client.fetch_and_cache_daily_odds(markets=markets)
+    odds_data = client.fetch_and_cache_daily_odds(
+        markets=markets,
+        event_ids=event_ids
+    )
 
     if not odds_data:
         print("❌ Failed to fetch odds")
         return
 
     print(f"✓ Successfully fetched odds")
-    print(f"  Credits used: {client.last_request_cost}")
+    print(f"  Events fetched: {odds_data.get('events_count', 0)}")
+    print(f"  Credits used: {odds_data.get('total_cost', 0)}")
     print(f"  Credits remaining: {client.credits_remaining}")
     print()
 
@@ -102,15 +124,15 @@ def main():
     print()
     print("=" * 60)
     print("Usage Summary:")
-    print(f"  Today's credits used: {client.last_request_cost}")
+    print(f"  Today's credits used: {odds_data.get('total_cost', 0)}")
     print(f"  Remaining this month: {client.credits_remaining}")
     print(f"  Free tier limit: 500 credits/month")
     print()
     print("Next steps:")
     print("  1. Review edges above")
-    print("  2. Manually verify lines on sportsbook")
-    print("  3. Place bets on highest +EV opportunities")
-    print("  4. Track results for model improvement")
+    print("  2. Record paper trades: python scripts/record_paper_trades.py")
+    print("  3. After games, evaluate: python scripts/evaluate_paper_trades.py")
+    print("  4. View ROI report: python scripts/view_paper_trading_report.py")
     print("=" * 60)
 
 

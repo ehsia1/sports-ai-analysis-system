@@ -9,9 +9,75 @@ import numpy as np
 from typing import List
 import logging
 
+import nfl_data_py as nfl
+
 from .base_predictor import BaseStatPredictor
 
 logger = logging.getLogger(__name__)
+
+
+def add_weather_features(df: pd.DataFrame, seasons: List[int]) -> pd.DataFrame:
+    """Add weather features from schedule data to player stats."""
+    try:
+        schedule = nfl.import_schedules(seasons)
+
+        # Get weather columns from schedule
+        weather_cols = ['season', 'week', 'home_team', 'away_team', 'roof', 'temp', 'wind']
+        sched_weather = schedule[weather_cols].copy()
+
+        # Create game-level weather lookup for home team players
+        home_weather = sched_weather.rename(columns={'home_team': 'recent_team'})
+        home_weather = home_weather[['season', 'week', 'recent_team', 'roof', 'temp', 'wind']]
+
+        # For away team players
+        away_weather = sched_weather.rename(columns={'away_team': 'recent_team'})
+        away_weather = away_weather[['season', 'week', 'recent_team', 'roof', 'temp', 'wind']]
+
+        # Combine home and away
+        game_weather = pd.concat([home_weather, away_weather]).drop_duplicates(
+            subset=['season', 'week', 'recent_team']
+        )
+
+        # Merge with player data
+        df = df.merge(game_weather, on=['season', 'week', 'recent_team'], how='left')
+
+        # Create derived features
+        df['is_dome'] = df['roof'].isin(['dome', 'closed']).astype(int)
+        df['is_outdoor'] = (~df['roof'].isin(['dome', 'closed'])).astype(int)
+
+        # Temperature features (fill NaN with moderate temp for domes)
+        df['game_temp'] = df['temp'].fillna(70)  # Dome default
+        df['is_cold'] = (df['game_temp'] < 35).astype(int)
+        df['is_very_cold'] = (df['game_temp'] < 25).astype(int)
+
+        # Wind features
+        df['game_wind'] = df['wind'].fillna(0)  # Dome default
+        df['is_windy'] = (df['game_wind'] > 15).astype(int)
+        df['is_very_windy'] = (df['game_wind'] > 20).astype(int)
+
+        # For dome games, ensure zero weather impact
+        df.loc[df['is_dome'] == 1, 'game_temp'] = 70
+        df.loc[df['is_dome'] == 1, 'game_wind'] = 0
+        df.loc[df['is_dome'] == 1, 'is_cold'] = 0
+        df.loc[df['is_dome'] == 1, 'is_very_cold'] = 0
+        df.loc[df['is_dome'] == 1, 'is_windy'] = 0
+        df.loc[df['is_dome'] == 1, 'is_very_windy'] = 0
+
+        logger.info(f"Added weather features: {df['is_dome'].sum()} dome games, "
+                   f"{df['is_cold'].sum()} cold games, {df['is_windy'].sum()} windy games")
+
+    except Exception as e:
+        logger.warning(f"Could not add weather features: {e}")
+        # Add default values
+        df['is_dome'] = 0
+        df['game_temp'] = 60
+        df['game_wind'] = 5
+        df['is_cold'] = 0
+        df['is_very_cold'] = 0
+        df['is_windy'] = 0
+        df['is_very_windy'] = 0
+
+    return df
 
 
 class RushingYardsPredictor(BaseStatPredictor):
@@ -80,6 +146,10 @@ class RushingYardsPredictor(BaseStatPredictor):
         for col in df.columns:
             if "last_" in col or "_std_" in col:
                 df[col] = df[col].fillna(0)
+
+        # Add weather features
+        seasons = df['season'].unique().tolist()
+        df = add_weather_features(df, seasons)
 
         logger.info(f"Built features for {len(df)} rushing records")
         return df
@@ -157,6 +227,10 @@ class PassingYardsPredictor(BaseStatPredictor):
             if "last_" in col or "_std_" in col:
                 df[col] = df[col].fillna(0)
 
+        # Add weather features (passing is most affected by weather)
+        seasons = df['season'].unique().tolist()
+        df = add_weather_features(df, seasons)
+
         logger.info(f"Built features for {len(df)} passing records")
         return df
 
@@ -232,6 +306,10 @@ class ReceptionsPredictor(BaseStatPredictor):
         for col in df.columns:
             if "last_" in col or "_std_" in col:
                 df[col] = df[col].fillna(0)
+
+        # Add weather features (affects passing game)
+        seasons = df['season'].unique().tolist()
+        df = add_weather_features(df, seasons)
 
         logger.info(f"Built features for {len(df)} reception records")
         return df

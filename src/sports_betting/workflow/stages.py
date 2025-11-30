@@ -545,12 +545,16 @@ class EdgeCalculationStage(WorkflowStage):
             season: NFL season
             week: Week number
             min_edge: Minimum edge threshold (default from settings)
+            notify: Send Discord notifications for top edges (default True)
+            notify_top_n: Number of top edges to notify (default 10)
 
         Returns:
             StageResult with edges_found count and edge details
         """
         started_at = datetime.now()
         min_edge = kwargs.get("min_edge", self.settings.min_edge)
+        notify = kwargs.get("notify", True)
+        notify_top_n = kwargs.get("notify_top_n", 10)
 
         self.logger.info(f"Calculating edges for {season} Week {week}")
 
@@ -583,6 +587,13 @@ class EdgeCalculationStage(WorkflowStage):
 
             self.logger.info(f"Found {len(edges)} betting edges")
 
+            # Send Discord notifications for top edges
+            notifications_sent = 0
+            if notify:
+                notifications_sent = self._send_discord_notifications(
+                    edges[:notify_top_n], calculator
+                )
+
             return self._create_result(
                 status=StageStatus.SUCCESS,
                 message=f"Found {len(edges)} edges with >{min_edge*100:.1f}% edge",
@@ -591,6 +602,7 @@ class EdgeCalculationStage(WorkflowStage):
                     "edges": edges,
                     "report": report,
                     "min_edge_pct": min_edge * 100,
+                    "notifications_sent": notifications_sent,
                 },
                 started_at=started_at,
                 ended_at=datetime.now(),
@@ -605,6 +617,83 @@ class EdgeCalculationStage(WorkflowStage):
                 started_at=started_at,
                 ended_at=datetime.now(),
             )
+
+    def _send_discord_notifications(self, edges: List[Dict], calculator) -> int:
+        """Send Discord notifications for top edges.
+
+        Args:
+            edges: List of edge dictionaries
+            calculator: EdgeCalculator instance for generating reasoning
+
+        Returns:
+            Number of notifications sent
+        """
+        from ..notifications.discord import send_edge_alert, DiscordNotifier
+
+        notifier = DiscordNotifier()
+        if not notifier.enabled:
+            self.logger.info("Discord notifications not configured, skipping")
+            return 0
+
+        sent_count = 0
+        for edge in edges:
+            try:
+                # Extract common edge data
+                player = edge.get("player", "Unknown")
+                market = edge.get("market", "")
+                prediction = edge.get("prediction", 0)
+                line = edge.get("line", 0)
+                confidence = edge.get("model_confidence", 0.7)
+                game = edge.get("game", "")
+                weather = edge.get("weather")
+                weather_warning = edge.get("weather_warning")
+                reasoning = edge.get("reasoning", "")
+                reasoning_detailed = edge.get("reasoning_detailed", "")
+
+                # Determine which side to bet (over or under has should_bet=True)
+                over_data = edge.get("over", {})
+                under_data = edge.get("under", {})
+
+                if under_data.get("should_bet"):
+                    side = "under"
+                    edge_pct = float(under_data.get("edge_pct", 0))
+                    ev_pct = float(under_data.get("ev_pct", 0))
+                elif over_data.get("should_bet"):
+                    side = "over"
+                    edge_pct = float(over_data.get("edge_pct", 0))
+                    ev_pct = float(over_data.get("ev_pct", 0))
+                else:
+                    # No bet recommended, skip
+                    continue
+
+                # Send alert
+                success = send_edge_alert(
+                    player_name=player,
+                    stat_type=market,
+                    line=line,
+                    prediction=prediction,
+                    edge_pct=edge_pct,
+                    direction=side,
+                    confidence=confidence,
+                    game=game,
+                    ev_pct=ev_pct,
+                    reasoning=reasoning,
+                    reasoning_detailed=reasoning_detailed,
+                    weather=weather,
+                    weather_warning=weather_warning,
+                )
+
+                if success:
+                    sent_count += 1
+                    self.logger.debug(f"Sent Discord alert for {player}")
+
+            except Exception as e:
+                self.logger.warning(f"Failed to send Discord alert for {edge.get('player', 'Unknown')}: {e}")
+
+        if sent_count > 0:
+            self.logger.info(f"Sent {sent_count} Discord notifications")
+
+        return sent_count
 
 
 class ResultsScoringStage(WorkflowStage):

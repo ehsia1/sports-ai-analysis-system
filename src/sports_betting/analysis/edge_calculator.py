@@ -19,6 +19,104 @@ class EdgeCalculator:
         self.min_edge = 0.03  # Minimum 3% edge to consider
         self.min_confidence = 0.65  # Minimum model confidence
 
+    def generate_reasoning(
+        self,
+        player: str,
+        position: str,
+        market: str,
+        prediction: float,
+        line: float,
+        side: str,
+        edge_pct: float,
+        ev_pct: float,
+        confidence: float,
+        weather: Optional[str] = None,
+        weather_warning: Optional[str] = None,
+    ) -> Dict[str, str]:
+        """
+        Generate human-readable reasoning for an edge.
+
+        Returns:
+            Dict with 'short' (1-line) and 'detailed' (multi-line) reasoning
+        """
+        # Market display name
+        market_names = {
+            'player_pass_yds': 'passing yards',
+            'player_rush_yds': 'rushing yards',
+            'player_reception_yds': 'receiving yards',
+            'player_receptions': 'receptions',
+            'player_pass_tds': 'passing TDs',
+        }
+        market_name = market_names.get(market, market.replace('player_', '').replace('_', ' '))
+
+        # Calculate difference
+        diff = prediction - line
+        diff_pct = (diff / line * 100) if line > 0 else 0
+
+        # Build short reasoning (1-line for notifications)
+        direction = "above" if diff > 0 else "below"
+        short_parts = [
+            f"Model: {prediction:.1f} vs line {line:.1f} ({abs(diff_pct):.0f}% {direction})"
+        ]
+
+        if weather_warning:
+            short_parts.append(f"⚠️ {weather_warning}")
+
+        short = " | ".join(short_parts)
+
+        # Build detailed reasoning (for Discord embed)
+        detailed_lines = []
+
+        # Primary reasoning
+        if side == 'over':
+            detailed_lines.append(
+                f"📈 **OVER {line}** {market_name}"
+            )
+            detailed_lines.append(
+                f"Model predicts **{prediction:.1f}** ({diff_pct:+.1f}% vs line)"
+            )
+        else:
+            detailed_lines.append(
+                f"📉 **UNDER {line}** {market_name}"
+            )
+            detailed_lines.append(
+                f"Model predicts **{prediction:.1f}** ({diff_pct:+.1f}% vs line)"
+            )
+
+        # Edge strength
+        if ev_pct >= 10:
+            strength = "🔥 Strong"
+        elif ev_pct >= 5:
+            strength = "✅ Good"
+        else:
+            strength = "📊 Moderate"
+        detailed_lines.append(f"{strength} edge: **{ev_pct:+.1f}% EV**")
+
+        # Confidence
+        conf_emoji = "🎯" if confidence >= 0.8 else "📍" if confidence >= 0.65 else "⚠️"
+        detailed_lines.append(f"{conf_emoji} Model confidence: {confidence:.0%}")
+
+        # Weather impact
+        if weather_warning:
+            detailed_lines.append(f"🌨️ Weather: {weather_warning} (confidence adjusted)")
+        elif weather and weather != "Dome":
+            detailed_lines.append(f"🌤️ Weather: {weather}")
+
+        # Position context
+        position_context = {
+            'QB': 'Quarterback consistency varies with game script',
+            'RB': 'Volume dependent on game flow and score',
+            'WR': 'Target share drives receiving production',
+            'TE': 'Red zone usage affects ceiling',
+        }
+        if position in position_context:
+            detailed_lines.append(f"ℹ️ {position_context[position]}")
+
+        return {
+            'short': short,
+            'detailed': '\n'.join(detailed_lines),
+        }
+
     def american_to_decimal(self, american_odds: int) -> float:
         """Convert American odds to decimal odds."""
         if american_odds > 0:
@@ -202,6 +300,31 @@ class EdgeCalculator:
                     if has_edge:
                         player = session.query(Player).get(prop.player_id)
 
+                        # Determine which side has the edge
+                        if edge_analysis['over']['should_bet']:
+                            bet_side = 'over'
+                            edge_pct = edge_analysis['over']['edge_pct']
+                            ev_pct = edge_analysis['over']['ev_pct']
+                        else:
+                            bet_side = 'under'
+                            edge_pct = edge_analysis['under']['edge_pct']
+                            ev_pct = edge_analysis['under']['ev_pct']
+
+                        # Generate reasoning
+                        reasoning = self.generate_reasoning(
+                            player=player.name,
+                            position=player.position,
+                            market=prop.market,
+                            prediction=edge_analysis['prediction'],
+                            line=edge_analysis['line'],
+                            side=bet_side,
+                            edge_pct=edge_pct,
+                            ev_pct=ev_pct,
+                            confidence=adjusted_confidence,
+                            weather=weather.summary if weather else None,
+                            weather_warning=weather_warning,
+                        )
+
                         edge_info = {
                             'game': f"{game.away_team.abbreviation} @ {game.home_team.abbreviation}",
                             'game_date': game.game_date,
@@ -210,6 +333,8 @@ class EdgeCalculator:
                             'market': prop.market,
                             'weather': weather.summary if weather else None,
                             'weather_warning': weather_warning,
+                            'reasoning': reasoning['short'],
+                            'reasoning_detailed': reasoning['detailed'],
                             **edge_analysis,
                         }
 
@@ -286,7 +411,7 @@ class EdgeCalculator:
                     existing.expected_value = ev
                     existing.kelly_fraction = kelly
                     existing.confidence = edge_data['model_confidence']
-                    existing.reasoning = f"Model predicts {edge_data['prediction']:.1f} vs line {edge_data['line']}"
+                    existing.reasoning = edge_data.get('reasoning', f"Model predicts {edge_data['prediction']:.1f} vs line {edge_data['line']}")
                     existing.created_at = datetime.now()
                     updated_count += 1
                 else:
@@ -304,7 +429,7 @@ class EdgeCalculator:
                         expected_value=ev,
                         kelly_fraction=kelly,
                         confidence=edge_data['model_confidence'],
-                        reasoning=f"Model predicts {edge_data['prediction']:.1f} vs line {edge_data['line']}",
+                        reasoning=edge_data.get('reasoning', f"Model predicts {edge_data['prediction']:.1f} vs line {edge_data['line']}"),
                     )
                     session.add(edge)
                     stored_count += 1
@@ -407,3 +532,39 @@ class EdgeCalculator:
             report.append(f"... and {len(table_edges) - top_n} more edges")
 
         return "\n".join(report)
+
+    def edge_to_alert_params(self, edge: Dict) -> Dict:
+        """
+        Convert an edge dict to parameters suitable for send_edge_alert().
+
+        Args:
+            edge: Edge dict from find_edges_for_week()
+
+        Returns:
+            Dict of keyword arguments for send_edge_alert()
+        """
+        # Determine which side has the edge
+        if edge['over']['should_bet']:
+            direction = 'over'
+            edge_pct = edge['over']['edge_pct']
+            ev_pct = edge['over']['ev_pct']
+        else:
+            direction = 'under'
+            edge_pct = edge['under']['edge_pct']
+            ev_pct = edge['under']['ev_pct']
+
+        return {
+            'player_name': edge['player'],
+            'stat_type': edge['market'],
+            'line': edge['line'],
+            'prediction': edge['prediction'],
+            'edge_pct': edge_pct,
+            'direction': direction,
+            'confidence': edge['model_confidence'],
+            'game': edge.get('game', ''),
+            'ev_pct': ev_pct,
+            'reasoning': edge.get('reasoning', ''),
+            'reasoning_detailed': edge.get('reasoning_detailed', ''),
+            'weather': edge.get('weather'),
+            'weather_warning': edge.get('weather_warning'),
+        }

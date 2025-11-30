@@ -83,6 +83,7 @@ def cmd_pre_game(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
         season=args.season,
         week=args.week,
         force=args.force,
+        notify=not getattr(args, "no_notify", False),
     )
 
     print(result.summary())
@@ -142,6 +143,113 @@ def cmd_full(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     print()
 
     return 0 if result.success else 1
+
+
+def cmd_notify(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
+    """Send Discord notifications for edges."""
+    from src.sports_betting.notifications.discord import send_edge_alert, DiscordNotifier
+    from src.sports_betting.analysis.edge_calculator import EdgeCalculator
+
+    notifier = DiscordNotifier()
+
+    if not notifier.enabled:
+        print("Error: Discord webhook URL not configured")
+        print("Set DISCORD_WEBHOOK_URL in your .env file")
+        return 1
+
+    # Test mode - send sample notifications
+    if args.test:
+        print("Sending test notifications to Discord...")
+        print()
+
+        calc = EdgeCalculator()
+
+        # Test 1: Strong over edge (good weather)
+        print("1. Sending strong OVER edge (dome game)...")
+        reasoning1 = calc.generate_reasoning(
+            player="Ja'Marr Chase",
+            position="WR",
+            market="player_reception_yds",
+            prediction=95.2,
+            line=72.5,
+            side="over",
+            edge_pct=12.1,
+            ev_pct=15.3,
+            confidence=0.88,
+            weather="Dome",
+            weather_warning=None,
+        )
+        send_edge_alert(
+            player_name="Ja'Marr Chase",
+            stat_type="player_reception_yds",
+            line=72.5,
+            prediction=95.2,
+            edge_pct=12.1,
+            direction="over",
+            confidence=0.88,
+            game="CIN @ DAL",
+            ev_pct=15.3,
+            reasoning=reasoning1['short'],
+            reasoning_detailed=reasoning1['detailed'],
+            weather="Dome",
+        )
+
+        # Test 2: Under edge with weather warning
+        print("2. Sending UNDER edge (bad weather)...")
+        reasoning2 = calc.generate_reasoning(
+            player="Brock Purdy",
+            position="QB",
+            market="player_pass_yds",
+            prediction=218.5,
+            line=245.5,
+            side="under",
+            edge_pct=6.8,
+            ev_pct=9.2,
+            confidence=0.72,
+            weather="Snow, 28°F, 15mph wind",
+            weather_warning="Snow, 28°F, 15mph wind",
+        )
+        send_edge_alert(
+            player_name="Brock Purdy",
+            stat_type="player_pass_yds",
+            line=245.5,
+            prediction=218.5,
+            edge_pct=6.8,
+            direction="under",
+            confidence=0.72,
+            game="SF @ CLE",
+            ev_pct=9.2,
+            reasoning=reasoning2['short'],
+            reasoning_detailed=reasoning2['detailed'],
+            weather="Snow, 28°F, 15mph wind",
+            weather_warning="Snow, 28°F, 15mph wind",
+        )
+
+        print()
+        print("✓ Test notifications sent! Check your Discord channel.")
+        return 0
+
+    # Send real edges from predictions file
+    status = orchestrator.get_status()
+    season = args.season or status['season']
+    week = args.week or status['week']
+
+    predictions_file = Path(f"data/predictions/predictions_{season}_week{week}.json")
+    if not predictions_file.exists():
+        print(f"No predictions found for {season} Week {week}")
+        print("Run 'orchestrate.py pre-game' first")
+        return 1
+
+    # For now, show what would be sent (edges need to be calculated with props)
+    print(f"Discord notifications ready for {season} Week {week}")
+    print()
+    print("To send edge alerts, edges must be calculated with live odds data.")
+    print("Run: orchestrate.py stage collect_odds")
+    print("Then: orchestrate.py stage calculate_edges")
+    print()
+    print("Or send a test notification with: orchestrate.py notify --test")
+
+    return 0
 
 
 def cmd_weather(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
@@ -235,6 +343,7 @@ def cmd_stage(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
         season=args.season,
         week=args.week,
         force=getattr(args, "force", False),
+        notify=not getattr(args, "no_notify", False),
     )
 
     print(f"Status:  {result.status.value}")
@@ -320,6 +429,11 @@ Examples:
         default=20,
         help="Number of top edges to display (default: 20)",
     )
+    pre_game.add_argument(
+        "--no-notify",
+        action="store_true",
+        help="Skip Discord notifications",
+    )
 
     # Post-game workflow
     subparsers.add_parser("post-game", help="Run post-game workflow")
@@ -357,6 +471,19 @@ Examples:
         type=int,
         default=20,
         help="Number of top edges to display (default: 20)",
+    )
+    stage.add_argument(
+        "--no-notify",
+        action="store_true",
+        help="Skip Discord notifications",
+    )
+
+    # Notify command
+    notify = subparsers.add_parser("notify", help="Send Discord notifications")
+    notify.add_argument(
+        "--test",
+        action="store_true",
+        help="Send a test notification to verify Discord setup",
     )
 
     # Weather command
@@ -414,6 +541,8 @@ Examples:
         return cmd_stage(orchestrator, args)
     elif args.command == "weather":
         return cmd_weather(orchestrator, args)
+    elif args.command == "notify":
+        return cmd_notify(orchestrator, args)
     else:
         parser.print_help()
         return 1

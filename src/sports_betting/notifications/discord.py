@@ -29,6 +29,12 @@ class EdgeAlert:
     direction: str  # "over" or "under"
     confidence: float
     book: str = "consensus"
+    game: str = ""  # e.g., "SF @ CLE"
+    ev_pct: float = 0.0  # Expected value percentage
+    reasoning: str = ""  # Short reasoning (1 line)
+    reasoning_detailed: str = ""  # Detailed reasoning (multi-line)
+    weather: Optional[str] = None  # Weather conditions
+    weather_warning: Optional[str] = None  # Weather warning if applicable
 
 
 @dataclass
@@ -169,10 +175,11 @@ class DiscordNotifier:
             )
             return False
 
-        # Determine color based on edge size
-        if alert.edge_pct >= 10:
+        # Determine color based on EV (or edge if EV not provided)
+        ev = alert.ev_pct if alert.ev_pct else alert.edge_pct
+        if ev >= 10:
             color = self.COLOR_SUCCESS  # High edge = green
-        elif alert.edge_pct >= 7:
+        elif ev >= 5:
             color = self.COLOR_EDGE  # Medium edge = purple
         else:
             color = self.COLOR_INFO  # Lower edge = blue
@@ -181,19 +188,47 @@ class DiscordNotifier:
         direction_emoji = "📈" if alert.direction == "over" else "📉"
 
         # Format stat type for display
-        stat_display = alert.stat_type.replace("_", " ").title()
+        stat_display = alert.stat_type.replace("player_", "").replace("_", " ").title()
 
-        title = f"{direction_emoji} Edge Alert: {alert.player_name}"
-        description = (
-            f"**{stat_display}** - {alert.direction.upper()} {alert.line}\n\n"
-            f"Our prediction: **{alert.prediction:.1f}**"
-        )
+        # Build title with game if available
+        title = f"{direction_emoji} {alert.player_name}"
+        if alert.game:
+            title += f" ({alert.game})"
+
+        # Build description with reasoning if available
+        if alert.reasoning_detailed:
+            description = alert.reasoning_detailed
+        else:
+            diff_pct = ((alert.prediction - alert.line) / alert.line * 100) if alert.line > 0 else 0
+            description = (
+                f"**{alert.direction.upper()} {alert.line}** {stat_display}\n\n"
+                f"Model predicts **{alert.prediction:.1f}** ({diff_pct:+.1f}% vs line)"
+            )
 
         fields = [
-            {"name": "Edge", "value": f"{alert.edge_pct:.1f}%", "inline": True},
+            {"name": "Edge", "value": f"{alert.edge_pct:+.1f}%", "inline": True},
+            {"name": "EV", "value": f"{alert.ev_pct:+.1f}%", "inline": True} if alert.ev_pct else None,
             {"name": "Confidence", "value": f"{alert.confidence:.0%}", "inline": True},
-            {"name": "Book", "value": alert.book, "inline": True},
         ]
+        # Filter out None fields
+        fields = [f for f in fields if f is not None]
+
+        # Add weather warning if present
+        if alert.weather_warning:
+            fields.append({
+                "name": "🌨️ Weather Alert",
+                "value": f"{alert.weather_warning} (confidence adjusted)",
+                "inline": False,
+            })
+        elif alert.weather and alert.weather != "Dome":
+            fields.append({
+                "name": "Weather",
+                "value": alert.weather,
+                "inline": True,
+            })
+
+        # Add book
+        fields.append({"name": "Book", "value": alert.book, "inline": True})
 
         footer = f"NFL Betting Bot | {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
@@ -414,6 +449,12 @@ def send_edge_alert(
     direction: str,
     confidence: float = 0.7,
     book: str = "consensus",
+    game: str = "",
+    ev_pct: float = 0.0,
+    reasoning: str = "",
+    reasoning_detailed: str = "",
+    weather: Optional[str] = None,
+    weather_warning: Optional[str] = None,
 ) -> bool:
     """Send an edge alert notification.
 
@@ -426,6 +467,12 @@ def send_edge_alert(
         direction: "over" or "under"
         confidence: Model confidence (0-1)
         book: Sportsbook name
+        game: Game matchup (e.g., "SF @ CLE")
+        ev_pct: Expected value percentage
+        reasoning: Short reasoning (1 line)
+        reasoning_detailed: Detailed reasoning (multi-line for Discord embed)
+        weather: Weather conditions
+        weather_warning: Weather warning if applicable
 
     Returns:
         True if sent successfully
@@ -439,6 +486,12 @@ def send_edge_alert(
         direction=direction,
         confidence=confidence,
         book=book,
+        game=game,
+        ev_pct=ev_pct,
+        reasoning=reasoning,
+        reasoning_detailed=reasoning_detailed,
+        weather=weather,
+        weather_warning=weather_warning,
     )
     return _get_notifier().send_edge_alert(alert)
 

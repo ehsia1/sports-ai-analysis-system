@@ -25,7 +25,7 @@ from sklearn.model_selection import train_test_split
 
 
 def load_data(seasons: list) -> tuple:
-    """Load weekly data and snap counts."""
+    """Load weekly data, snap counts, and schedule (for weather)."""
     print(f"Loading data for seasons {seasons}...")
 
     weekly = nfl.import_weekly_data(seasons)
@@ -34,7 +34,66 @@ def load_data(seasons: list) -> tuple:
     snaps = nfl.import_snap_counts(seasons)
     print(f"  Snap count records: {len(snaps)}")
 
-    return weekly, snaps
+    schedule = nfl.import_schedules(seasons)
+    print(f"  Schedule records: {len(schedule)}")
+
+    return weekly, snaps, schedule
+
+
+def add_weather_features(df: pd.DataFrame, schedule: pd.DataFrame) -> pd.DataFrame:
+    """Add weather features from schedule data."""
+    print("\nAdding weather features...")
+
+    # Get weather columns from schedule
+    weather_cols = ['season', 'week', 'home_team', 'away_team', 'roof', 'temp', 'wind']
+    sched_weather = schedule[weather_cols].copy()
+
+    # Create game-level weather lookup
+    # For home team players
+    home_weather = sched_weather.rename(columns={'home_team': 'recent_team'})
+    home_weather = home_weather[['season', 'week', 'recent_team', 'roof', 'temp', 'wind']]
+
+    # For away team players
+    away_weather = sched_weather.rename(columns={'away_team': 'recent_team'})
+    away_weather = away_weather[['season', 'week', 'recent_team', 'roof', 'temp', 'wind']]
+
+    # Combine home and away
+    game_weather = pd.concat([home_weather, away_weather]).drop_duplicates(
+        subset=['season', 'week', 'recent_team']
+    )
+
+    # Merge with player data
+    df = df.merge(game_weather, on=['season', 'week', 'recent_team'], how='left')
+
+    # Create derived features
+    df['is_dome'] = df['roof'].isin(['dome', 'closed']).astype(int)
+    df['is_outdoor'] = (~df['roof'].isin(['dome', 'closed'])).astype(int)
+
+    # Temperature features (fill NaN with moderate temp for domes)
+    df['game_temp'] = df['temp'].fillna(70)  # Dome default
+    df['is_cold'] = (df['game_temp'] < 35).astype(int)
+    df['is_very_cold'] = (df['game_temp'] < 25).astype(int)
+
+    # Wind features
+    df['game_wind'] = df['wind'].fillna(0)  # Dome default
+    df['is_windy'] = (df['game_wind'] > 15).astype(int)
+    df['is_very_windy'] = (df['game_wind'] > 20).astype(int)
+
+    # For outdoor games, set dome-like conditions for missing data
+    df.loc[df['is_dome'] == 1, 'game_temp'] = 70
+    df.loc[df['is_dome'] == 1, 'game_wind'] = 0
+    df.loc[df['is_dome'] == 1, 'is_cold'] = 0
+    df.loc[df['is_dome'] == 1, 'is_very_cold'] = 0
+    df.loc[df['is_dome'] == 1, 'is_windy'] = 0
+    df.loc[df['is_dome'] == 1, 'is_very_windy'] = 0
+
+    weather_coverage = df['temp'].notna().sum() / len(df) * 100
+    print(f"  Weather data coverage: {weather_coverage:.1f}%")
+    print(f"  Dome games: {df['is_dome'].sum()}")
+    print(f"  Cold games (<35°F): {df['is_cold'].sum()}")
+    print(f"  Windy games (>15mph): {df['is_windy'].sum()}")
+
+    return df
 
 
 def add_snap_counts(df: pd.DataFrame, snaps: pd.DataFrame) -> pd.DataFrame:
@@ -320,10 +379,13 @@ def main():
     print("="*60)
 
     seasons = [2020, 2021, 2022, 2023, 2024]
-    weekly, snaps = load_data(seasons)
+    weekly, snaps, schedule = load_data(seasons)
 
     # Add snap counts
     weekly = add_snap_counts(weekly, snaps)
+
+    # Add weather features
+    weekly = add_weather_features(weekly, schedule)
 
     results = {}
 
@@ -333,7 +395,9 @@ def main():
         'rush_yards_last_3', 'rush_yards_last_5',
         'rush_yards_std_3', 'rush_yards_std_5',
         'carries_last_3', 'carries_last_5',
-        'ypc_career', 'position_encoded', 'week_num', 'snap_pct'
+        'ypc_career', 'position_encoded', 'week_num', 'snap_pct',
+        # Weather features
+        'is_dome', 'game_temp', 'is_cold',
     ]
     rush_model = train_model(rush_df, 'rushing_yards', rush_features, 'rushing_yards')
     save_model(rush_model, 'rushing_yards')
@@ -345,7 +409,9 @@ def main():
         'pass_yards_last_3', 'pass_yards_last_5',
         'pass_yards_std_3', 'pass_yards_std_5',
         'attempts_last_3', 'attempts_last_5',
-        'comp_pct_last_5', 'ypa_career', 'week_num'
+        'comp_pct_last_5', 'ypa_career', 'week_num',
+        # Weather features (passing is most affected)
+        'is_dome', 'game_temp', 'game_wind', 'is_cold', 'is_windy', 'is_very_windy',
     ]
     pass_model = train_model(pass_df, 'passing_yards', pass_features, 'passing_yards')
     save_model(pass_model, 'passing_yards')
@@ -358,7 +424,9 @@ def main():
         'receptions_std_3', 'receptions_std_5',
         'targets_last_3', 'targets_last_5',
         'target_share_last_3', 'target_share_last_5',
-        'catch_rate_last_5', 'position_encoded', 'week_num', 'snap_pct'
+        'catch_rate_last_5', 'position_encoded', 'week_num', 'snap_pct',
+        # Weather features (affects passing game)
+        'is_dome', 'game_temp', 'game_wind', 'is_cold', 'is_windy',
     ]
     rec_model = train_model(rec_df, 'receptions', rec_features, 'receptions')
     save_model(rec_model, 'receptions')

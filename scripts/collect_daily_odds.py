@@ -2,140 +2,75 @@
 """
 Daily odds collection script.
 
-Run this once per day to fetch odds and calculate edges.
+Thin wrapper around the orchestrator's collect_odds stage.
+Run this once per day to fetch odds from The Odds API.
+
+Usage:
+    python scripts/collect_daily_odds.py
+    python scripts/collect_daily_odds.py --force  # Force fetch even if cached
 """
+import argparse
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.sports_betting.config import get_settings
-from src.sports_betting.utils import get_logger
-from src.sports_betting.data.odds_api import OddsAPIClient
-from src.sports_betting.analysis.edge_calculator import EdgeCalculator
+from src.sports_betting.workflow import Orchestrator, StageStatus
+from src.sports_betting.utils import get_logger, setup_logging
 
+# Set up logging
+setup_logging()
 logger = get_logger(__name__)
 
 
-def get_current_week() -> tuple[int, int]:
-    """Get current NFL season and week.
-
-    TODO: Move to utils/nfl_schedule.py in Phase 2
-    """
-    # For now, hardcode but log a warning
-    # Phase 2 will implement dynamic detection
-    season = 2024
-    week = 13
-    logger.warning(f"Using hardcoded week {week} - Phase 2 will add dynamic detection")
-    return season, week
-
-
 def main():
-    """Collect daily odds and calculate edges."""
-    settings = get_settings()
+    """Collect daily odds using the orchestrator."""
+    parser = argparse.ArgumentParser(description="Collect daily odds from The Odds API")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force fetch even if cached",
+    )
+    parser.add_argument(
+        "--week",
+        type=int,
+        help="Override week number",
+    )
+    parser.add_argument(
+        "--season",
+        type=int,
+        help="Override season year",
+    )
+    args = parser.parse_args()
 
     logger.info("=" * 50)
     logger.info("DAILY ODDS COLLECTION")
     logger.info("=" * 50)
 
-    # Initialize API client
-    client = OddsAPIClient()
-
-    if not client.api_key:
-        logger.error("No API key configured!")
-        logger.info("To set up:")
-        logger.info("  1. Sign up for free at: https://the-odds-api.com/")
-        logger.info("  2. Get your API key")
-        logger.info("  3. Add to .env file: ODDS_API_KEY=your_key_here")
-        return 1
-
-    # Check if we need to fetch today
-    if not client.should_fetch_new_odds():
-        logger.info("Already fetched odds today - using cached data")
-        logger.debug(f"Cache location: {client.cache_dir}")
-        return 0
-
-    logger.info("Fetching odds from The Odds API...")
-
-    # Get upcoming games
-    events = client.get_nfl_games()
-    logger.info(f"Found {len(events)} upcoming NFL games")
-
-    # Limit to conserve credits (1 market × 1 region × N events = N credits)
-    max_events = min(5, len(events))
-    event_ids = [e['id'] for e in events[:max_events]]
-
-    logger.info(f"Fetching odds for {len(event_ids)} games")
-    for i, event in enumerate(events[:max_events], 1):
-        logger.debug(f"  {i}. {event['away_team']} @ {event['home_team']}")
-
-    # Fetch odds for receiving yards (most accurate model)
-    markets = ['player_reception_yds']
-
-    odds_data = client.fetch_and_cache_daily_odds(
-        markets=markets,
-        event_ids=event_ids
+    orchestrator = Orchestrator()
+    result = orchestrator.run_stage(
+        "collect_odds",
+        season=args.season,
+        week=args.week,
+        force=args.force,
     )
 
-    if not odds_data:
-        logger.error("Failed to fetch odds")
-        return 1
+    # Display result
+    logger.info(f"Status: {result.status.value}")
+    logger.info(f"Message: {result.message}")
 
-    logger.info(f"Successfully fetched odds")
-    logger.info(f"  Events: {odds_data.get('events_count', 0)}")
-    logger.info(f"  Credits used: {odds_data.get('total_cost', 0)}")
-    logger.info(f"  Credits remaining: {client.credits_remaining}")
+    if result.data:
+        if "props_stored" in result.data:
+            logger.info(f"Props stored: {result.data['props_stored']}")
+        if "credits_used" in result.data:
+            logger.info(f"Credits used: {result.data['credits_used']}")
+        if "credits_remaining" in result.data:
+            logger.info(f"Credits remaining: {result.data['credits_remaining']}")
 
-    # Store in database
-    logger.info("Storing odds in database...")
-    stored = client.store_odds_in_database(odds_data)
-    logger.info(f"Stored {stored} props")
-
-    # Calculate edges
-    logger.info("Calculating betting edges...")
-    calculator = EdgeCalculator()
-
-    # Use settings for thresholds
-    calculator.min_edge = settings.min_edge
-    calculator.min_confidence = settings.min_confidence
-
-    current_season, current_week = get_current_week()
-
-    edges = calculator.find_edges_for_week(
-        week=current_week,
-        season=current_season,
-        min_edge=settings.min_edge
-    )
-
-    if edges:
-        logger.info(f"Found {len(edges)} betting opportunities!")
-
-        # Display report
-        report = calculator.format_edge_report(edges)
-        print(report)  # Keep print for formatted report display
-
-        # Store edges in database
-        calculator.store_edges_in_database(edges)
-        logger.info("Edges stored in database")
-
-    else:
-        logger.warning("No edges found for this week")
-        logger.info("Possible reasons: market aligned with model, no predictions, or threshold too high")
-
-    # Summary
-    logger.info("=" * 50)
-    logger.info("SUMMARY")
-    logger.info(f"  Credits used today: {odds_data.get('total_cost', 0)}")
-    logger.info(f"  Remaining this month: {client.credits_remaining}")
-    logger.info(f"  Monthly limit: {settings.odds_api_monthly_limit}")
     logger.info("=" * 50)
 
-    return 0
+    return 0 if result.status in (StageStatus.SUCCESS, StageStatus.SKIPPED) else 1
 
 
 if __name__ == "__main__":

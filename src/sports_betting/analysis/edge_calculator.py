@@ -292,38 +292,74 @@ class EdgeCalculator:
             session.commit()
             logger.info(f"Stored {stored_count} new edges, updated {updated_count} existing")
 
-    def format_edge_report(self, edges: List[Dict]) -> str:
-        """Format edges into a readable report."""
+    def format_edge_report(self, edges: List[Dict], top_n: int = 20) -> str:
+        """Format edges into a readable report with compact table."""
         if not edges:
             return "No edges found."
 
-        report = ["=" * 80]
-        report.append(f"BETTING EDGES REPORT - {len(edges)} opportunities found")
-        report.append("=" * 80)
+        # Group by market for summary
+        by_market = {}
+        for edge in edges:
+            market = edge['market']
+            if market not in by_market:
+                by_market[market] = []
+            by_market[market].append(edge)
+
+        report = []
+        report.append(f"BETTING EDGES - {len(edges)} opportunities found")
         report.append("")
 
-        for i, edge in enumerate(edges, 1):
-            # Determine best side
+        # Summary by market
+        report.append("By Market:")
+        for market, market_edges in sorted(by_market.items()):
+            market_name = market.replace('player_', '').replace('_', ' ').title()
+            report.append(f"  {market_name}: {len(market_edges)} edges")
+        report.append("")
+
+        # Prepare edges for table (sort by EV)
+        table_edges = []
+        for edge in edges:
             if edge['over']['ev'] > edge['under']['ev']:
-                best_side = 'OVER'
+                side = 'OVER'
                 ev = edge['over']['ev_pct']
                 edge_pct = edge['over']['edge_pct']
                 odds = edge['over']['odds']
             else:
-                best_side = 'UNDER'
+                side = 'UNDER'
                 ev = edge['under']['ev_pct']
                 edge_pct = edge['under']['edge_pct']
                 odds = edge['under']['odds']
 
-            report.append(f"{i}. {edge['player']} - {edge['market'].replace('_', ' ').title()}")
-            report.append(f"   Game: {edge['game']}")
-            report.append(f"   Line: {edge['line']}")
-            report.append(f"   Model Prediction: {edge['prediction']:.1f}")
-            report.append(f"   Confidence: {edge['model_confidence']:.1%}")
-            report.append(f"   ")
-            report.append(f"   >>> BET {best_side} {odds:+d}")
-            report.append(f"   >>> Edge: {edge_pct:+.1f}%")
-            report.append(f"   >>> Expected Value: {ev:+.1f}%")
+            table_edges.append({
+                'side': side,
+                'player': edge['player'][:18],  # Truncate long names
+                'market': edge['market'].replace('player_', '').replace('_yds', '').replace('_', ' ')[:8],
+                'line': edge['line'],
+                'pred': edge['prediction'],
+                'ev': ev,
+                'edge': edge_pct,
+                'odds': odds,
+                'conf': edge['model_confidence'],
+            })
+
+        # Sort by EV descending
+        table_edges.sort(key=lambda x: x['ev'], reverse=True)
+
+        # Print table header
+        report.append(f"Top {min(top_n, len(table_edges))} Edges by EV:")
+        report.append("")
+        report.append(f"{'Side':<6} {'Player':<18} {'Market':<8} {'Line':>6} {'Pred':>6} {'EV':>7} {'Edge':>6} {'Odds':>6}")
+        report.append("-" * 72)
+
+        # Print top edges
+        for e in table_edges[:top_n]:
+            report.append(
+                f"{e['side']:<6} {e['player']:<18} {e['market']:<8} "
+                f"{e['line']:>6.1f} {e['pred']:>6.1f} {e['ev']:>+6.1f}% {e['edge']:>+5.1f}% {e['odds']:>+5d}"
+            )
+
+        if len(table_edges) > top_n:
             report.append("")
+            report.append(f"... and {len(table_edges) - top_n} more edges")
 
         return "\n".join(report)

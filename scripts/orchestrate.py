@@ -90,12 +90,17 @@ def cmd_pre_game(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
 
     # Print edge report if available
     for stage_result in result.stage_results:
-        if stage_result.stage_name == "calculate_edges" and "report" in stage_result.data:
-            print()
-            print("=" * 50)
-            print("BETTING EDGES")
-            print("=" * 50)
-            print(stage_result.data["report"])
+        if stage_result.stage_name == "calculate_edges" and "edges" in stage_result.data:
+            edges = stage_result.data["edges"]
+            if edges:
+                print()
+                print("=" * 50)
+                print("BETTING EDGES")
+                print("=" * 50)
+                # Re-generate report with user's --top value
+                from src.sports_betting.analysis.edge_calculator import EdgeCalculator
+                calculator = EdgeCalculator()
+                print(calculator.format_edge_report(edges, top_n=args.top))
 
     return 0 if result.success else 1
 
@@ -179,9 +184,27 @@ def cmd_stage(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     if result.data:
         print()
         print("Data:")
+        # Keys to skip (large data structures)
+        skip_keys = {"report", "edges", "predictions", "all_predictions"}
         for key, value in result.data.items():
-            if key != "report":  # Skip long reports
+            if key in skip_keys:
+                continue
+            # Format lists/dicts nicely
+            if isinstance(value, (list, dict)) and len(str(value)) > 100:
+                if isinstance(value, list):
+                    print(f"  {key}: [{len(value)} items]")
+                else:
+                    print(f"  {key}: {{{len(value)} keys}}")
+            else:
                 print(f"  {key}: {value}")
+
+        # Print edge report if edges are available
+        if "edges" in result.data and result.data["edges"]:
+            print()
+            from src.sports_betting.analysis.edge_calculator import EdgeCalculator
+            calculator = EdgeCalculator()
+            top_n = getattr(args, "top", 20)
+            print(calculator.format_edge_report(result.data["edges"], top_n=top_n))
 
     if result.duration_seconds:
         print()
@@ -232,6 +255,12 @@ Examples:
         action="store_true",
         help="Force fetch even if cached",
     )
+    pre_game.add_argument(
+        "--top",
+        type=int,
+        default=20,
+        help="Number of top edges to display (default: 20)",
+    )
 
     # Post-game workflow
     subparsers.add_parser("post-game", help="Run post-game workflow")
@@ -263,6 +292,12 @@ Examples:
         "--force",
         action="store_true",
         help="Force execution even if cached",
+    )
+    stage.add_argument(
+        "--top",
+        type=int,
+        default=20,
+        help="Number of top edges to display (default: 20)",
     )
 
     args = parser.parse_args()

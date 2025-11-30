@@ -1,11 +1,11 @@
 # Week 13 (2025) All Stats Predictions
 
-Generated: 2025-11-29 18:04
+Generated: 2025-11-29 20:00
 
 ## Summary
-- Total quality edges: 102
+- Total quality edges: 103
 - Receiving Yards: 33 edges
-- Receptions: 44 edges
+- Receptions: 45 edges
 - Rushing Yards: 18 edges
 - Passing Yards: 7 edges
 
@@ -33,21 +33,21 @@ Generated: 2025-11-29 18:04
 
 | Bet | Player | Matchup | Line | Pred | Edge | Odds | Actual | Result |
 |-----|--------|---------|------|------|------|------|--------|--------|
-| UNDER | Devin Singletary | NYG @ NE | 1.5 | 0.8 | -48.2% | -210 | | |
-| OVER | Marvin Mims Jr. | DEN @ WAS | 1.5 | 2.2 | +45.5% | -101 | | |
-| UNDER | Jaylen Waddle | NO @ MIA | 5.5 | 3.2 | -41.3% | -160 | | |
-| UNDER | Ty Johnson | BUF @ PIT | 1.5 | 0.9 | -39.1% | -110 | | |
-| UNDER | Michael Wilson | ARI @ TB | 4.5 | 2.9 | -36.2% | +107 | | |
-| UNDER | De'Von Achane | NO @ MIA | 4.5 | 2.9 | -35.5% | +116 | | |
-| UNDER | Khalil Shakir | BUF @ PIT | 4.5 | 2.9 | -34.7% | +104 | | |
-| UNDER | Tyrone Tracy Jr. | NYG @ NE | 2.5 | 1.7 | -33.8% | -111 | | |
-| UNDER | RJ Harvey | DEN @ WAS | 2.5 | 1.8 | -29.9% | -120 | | |
-| OVER | Greg Dulcich | NO @ MIA | 1.5 | 1.9 | +26.7% | +145 | | |
-| UNDER | Darren Waller | NO @ MIA | 2.5 | 1.8 | -26.6% | -151 | | |
-| UNDER | TreVeyon Henderson | NYG @ NE | 2.5 | 1.9 | -25.4% | -125 | | |
-| UNDER | Austin Hooper | NYG @ NE | 1.5 | 1.1 | -25.1% | -160 | | |
-| UNDER | Pat Freiermuth | BUF @ PIT | 2.5 | 1.9 | -23.7% | -169 | | |
-| UNDER | Troy Franklin | DEN @ WAS | 4.5 | 3.5 | -23.0% | -147 | | |
+| UNDER | Devin Singletary | NYG @ NE | 1.5 | 0.8 | -48.7% | -210 | | |
+| UNDER | Ty Johnson | BUF @ PIT | 1.5 | 0.9 | -37.4% | -110 | | |
+| OVER | Rachaad White | ARI @ TB | 1.5 | 2.1 | +37.0% | -129 | | |
+| UNDER | Jaylen Waddle | NO @ MIA | 5.5 | 3.6 | -34.6% | -160 | | |
+| OVER | Greg Dulcich | NO @ MIA | 1.5 | 1.9 | +28.7% | +145 | | |
+| UNDER | Tyrone Tracy Jr. | NYG @ NE | 2.5 | 1.8 | -28.5% | -111 | | |
+| OVER | Jaylen Warren | BUF @ PIT | 1.5 | 1.9 | +27.8% | -117 | | |
+| UNDER | Michael Wilson | ARI @ TB | 4.5 | 3.3 | -26.8% | +107 | | |
+| OVER | Keon Coleman | BUF @ PIT | 2.5 | 3.2 | +26.0% | +125 | | |
+| OVER | Bucky Irving | ARI @ TB | 2.5 | 3.1 | +25.2% | +150 | | |
+| UNDER | De'Von Achane | NO @ MIA | 4.5 | 3.5 | -22.1% | +116 | | |
+| UNDER | Khalil Shakir | BUF @ PIT | 4.5 | 3.5 | -21.6% | +104 | | |
+| OVER | Isaiah Hodgins | NYG @ NE | 2.5 | 3.0 | +21.0% | +127 | | |
+| UNDER | RJ Harvey | DEN @ WAS | 2.5 | 2.0 | -20.4% | -120 | | |
+| UNDER | TreVeyon Henderson | NYG @ NE | 2.5 | 2.0 | -18.8% | -125 | | |
 
 ## Rushing Yards
 

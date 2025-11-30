@@ -156,7 +156,11 @@ def predict_passing_yards(ngs_data: pd.DataFrame, model_data: dict) -> pd.DataFr
 
 
 def predict_receptions(pfr_data: pd.DataFrame, model_data: dict) -> pd.DataFrame:
-    """Generate receptions predictions."""
+    """Generate receptions predictions using ensemble approach.
+
+    Blends ML prediction (70%) with season average (30%) to reduce
+    the model's slight conservative bias (-0.16 rec/game).
+    """
     model = model_data['model']
     features = model_data['features']
 
@@ -170,6 +174,9 @@ def predict_receptions(pfr_data: pd.DataFrame, model_data: dict) -> pd.DataFrame
     receptions = df.get('rec', 0)
     targets = df.get('tgt', 0)
     target_share = df.get('tgt_percent', 0) / 100
+
+    # Calculate season average (for ensemble)
+    season_avg = receptions / games
 
     df['receptions_last_3'] = receptions / games
     df['receptions_last_5'] = receptions / games
@@ -188,12 +195,17 @@ def predict_receptions(pfr_data: pd.DataFrame, model_data: dict) -> pd.DataFrame
     df['position_encoded'] = df.get('pos', 'WR').map(pos_map).fillna(2)
 
     X = df[features].fillna(0).values
-    predictions = model.predict(X)
+    ml_predictions = model.predict(X)
+
+    # Ensemble: 70% ML + 30% season average
+    ensemble_predictions = 0.7 * ml_predictions + 0.3 * season_avg.values
+
+    print(f"  Ensemble adjustment: ML avg {ml_predictions.mean():.2f} -> Ensemble avg {ensemble_predictions.mean():.2f}")
 
     return pd.DataFrame({
         'player_name': df['player'],
         'position': df.get('pos', 'WR'),
-        'predicted': predictions
+        'predicted': ensemble_predictions
     })
 
 

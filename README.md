@@ -1,215 +1,187 @@
-# Sports Betting AI/ML Analysis System
+# NFL Player Props Prediction System
 
-An advanced AI-powered sports betting analysis system focused on NFL parlay creation with comprehensive reasoning and multi-source data integration.
+A machine learning system for predicting NFL player props and identifying betting edges by comparing model predictions to sportsbook lines.
 
-## Features
+## What It Does
 
-- **Parlay Creation Engine**: Generate optimized multi-leg and same-game parlays with correlation analysis
-- **Comprehensive Reasoning**: Detailed explanations for every parlay leg with statistical analysis
-- **AI/ML Predictions**: XGBoost, Neural Networks for player prop predictions and fair value estimation
-- **Multi-Source Data**: Integrate live odds API, historical data, ESPN API, and manual inputs
-- **Smart API Management**: Budget-protected requests within free tier limits with intelligent caching
-- **Portfolio Optimization**: Kelly criterion sizing with risk management and allocation strategies
-- **Same-Game Parlay Validation**: Sportsbook rule compliance and correlation constraints
-- **Edge Detection**: Find profitable betting opportunities with confidence scoring
-- **Performance Tracking**: Monitor model accuracy and profitability
+This system:
+1. **Trains ML models** on historical NFL data (2020-2024) to predict player statistics
+2. **Fetches live odds** from The Odds API for current week's player props
+3. **Generates predictions** for receiving yards, rushing yards, passing yards, and receptions
+4. **Identifies edges** where our predictions significantly differ from sportsbook lines
+5. **Tracks results** to measure model accuracy and betting ROI
+
+## Supported Stat Types
+
+| Stat Type | Model | Test R² | Notes |
+|-----------|-------|---------|-------|
+| Receiving Yards | Adaptive XGBoost | 0.31 | Best performing, uses rolling features |
+| Rushing Yards | XGBoost v2 | 0.56 | Well calibrated, no bias |
+| Passing Yards | XGBoost v2 | 0.15 | Uses NGS data for predictions |
+| Receptions | XGBoost v2 + Ensemble | 0.34 | 70% ML + 30% season avg blend |
 
 ## Quick Start
 
-### Core System (Ready Now)
-1. **Check system capabilities**:
-   ```bash
-   python3 system_capabilities_demo.py
-   ```
+### 1. Install Dependencies
 
-2. **Generate sample parlay with reasoning**:
-   ```bash
-   python3 -c "
-   import sys; sys.path.insert(0, 'src')
-   from sports_betting.analysis.reasoning_engine import demo_reasoning_engine
-   demo_reasoning_engine()
-   "
-   ```
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-### Enhanced System (ML Features)
-1. **Install ML dependencies**:
-   ```bash
-   pip install pandas numpy scikit-learn xgboost torch nfl-data-py
-   ```
+### 2. Set Up API Key
 
-2. **Set up environment**:
-   ```bash
-   cp .env.example .env
-   # Add ODDS_API_KEY=your_actual_key to .env
-   ```
+```bash
+cp .env.example .env
+# Add your Odds API key: ODDS_API_KEY=your_key_here
+```
 
-3. **Run enhanced system demo**:
-   ```bash
-   python3 enhanced_system_demo.py
-   ```
+Get a free API key at [The Odds API](https://the-odds-api.com/).
 
-4. **Generate Week 2 parlays with reasoning**:
-   ```bash
-   python3 -c "
-   from sports_betting.analysis.enhanced_recommender import EnhancedParlayRecommender
-   from sports_betting.database import get_session
-   recommender = EnhancedParlayRecommender(get_session())
-   report = recommender.generate_enhanced_recommendations(
-       week=2, season=2024, include_reasoning=True, train_models=True
-   )
-   print('Enhanced parlays with detailed reasoning generated!')
-   "
-   ```
+### 3. Train Models
 
-## Configuration
+```bash
+python scripts/train_models_v2.py
+```
 
-Set up your API keys in `.env`:
-- `ODDS_API_KEY`: The Odds API key
-- `WEATHER_API_KEY`: Weather API key (optional)
+### 4. Collect Odds & Generate Predictions
+
+```bash
+# Fetch this week's player props
+python scripts/collect_daily_odds.py
+
+# Generate predictions for all stat types
+python scripts/predict_week13_all.py
+```
+
+### 5. After Games - Collect Results
+
+```bash
+python scripts/collect_results.py
+```
 
 ## Project Structure
 
 ```
 sports-betting/
 ├── src/sports_betting/
-│   ├── data/              # Data collection and processing
-│   ├── models/            # ML models and training
-│   ├── features/          # Feature engineering
-│   ├── analysis/          # Edge detection and EV calculation
-│   ├── database/          # Database models and operations
-│   ├── cli/               # Command line interfaces
-│   └── config/            # Configuration management
-├── config/                # Configuration files
-├── data/                  # Local data storage
-├── outputs/               # Analysis results
-└── tests/                 # Test suite
+│   ├── ml/                    # ML models and predictors
+│   │   ├── receiving_yards.py # Adaptive receiving predictor
+│   │   └── __init__.py
+│   ├── data/                  # Data collection
+│   │   ├── odds_api.py        # The Odds API client
+│   │   └── collectors/        # NFL data collectors
+│   ├── database/              # SQLite database models
+│   └── analysis/              # Edge calculation
+├── scripts/
+│   ├── train_models_v2.py     # Train all prediction models
+│   ├── predict_week13_all.py  # Generate multi-stat predictions
+│   ├── collect_daily_odds.py  # Fetch odds from API
+│   └── collect_results.py     # Score predictions after games
+├── models/                    # Saved model files (.pkl)
+├── data/                      # SQLite database
+└── docs/                      # Analysis reports
 ```
 
 ## Usage Examples
 
-### Parlay Generation with Reasoning
+### Generate Predictions
+
+```python
+from src.sports_betting.ml import ReceivingYardsPredictor
+
+predictor = ReceivingYardsPredictor()
+predictions, diagnostics = predictor.predict_adaptive(2025, 13)
+print(predictions[['player_name', 'predicted_yards', 'confidence']])
+```
+
+### Find Betting Edges
+
 ```bash
-# Check all system capabilities
-python3 system_capabilities_demo.py
+# Run the full prediction pipeline
+python scripts/predict_week13_all.py
 
-# Generate sample parlay with detailed reasoning
-python3 -c "
-import sys; sys.path.insert(0, 'src')
-from sports_betting.analysis.reasoning_engine import ReasoningEngine
-from sports_betting.database import get_session
-engine = ReasoningEngine(get_session())
-reasoning = engine.generate_parlay_reasoning({
-    'legs': [{'prop': 'receiving_yards', 'player': 'Travis Kelce', 'line': 72.5}],
-    'correlations': {('receiving_yards', 'receptions'): 0.85}
-})
-print('Detailed parlay reasoning generated!')
-"
+# Output shows edges like:
+# OVER  Keon Coleman  Rec Yards  25.5  35.2  +38.1%  -118
+# UNDER Taysom Hill   Rush Yards 22.5  14.7  -34.7%  -110
 ```
 
-### Data Collection and Analysis
-```bash
-# Test data manager capabilities
-python3 -c "
-import sys; sys.path.insert(0, 'src')
-from sports_betting.data.data_manager import DataManager
-from sports_betting.database import get_session
-manager = DataManager(get_session())
-data = manager.feed_week_data(week=2, season=2024, data_sources=['espn', 'historical'])
-print(f'Collected data for {len(data.get(\"games\", []))} games')
-"
+### Check API Usage
 
-# Test NFL historical data collection
-python3 -c "
-import sys; sys.path.insert(0, 'src')
-from sports_betting.data.collectors.nfl_historical import demo_historical_collector
-demo_historical_collector()
-"
+```python
+from src.sports_betting.data.odds_api import OddsAPIClient
+
+client = OddsAPIClient()
+print(f"Remaining API credits: {client.remaining_requests}")
 ```
 
-### Enhanced ML Recommendations
-```bash
-# Generate complete enhanced recommendations
-python3 enhanced_system_demo.py
+## Model Training
 
-# Create portfolio with reasoning
-python3 -c "
-from sports_betting.analysis.enhanced_recommender import EnhancedParlayRecommender
-from sports_betting.database import get_session
-recommender = EnhancedParlayRecommender(get_session())
-report = recommender.generate_enhanced_recommendations(
-    week=2, season=2024, bankroll=10000, 
-    risk_tolerance='moderate', include_reasoning=True
-)
-print('Portfolio with detailed reasoning generated!')
-"
+Models are trained on historical data using only features available before each game:
+
+```python
+# Features used (all computed from prior games):
+- Rolling averages (last 3 and 5 games)
+- Rolling standard deviation
+- Career averages (yards per attempt, catch rate, etc.)
+- Position encoding
+- Week number
+- Snap percentage
 ```
 
-### API Management and Caching
-```bash
-# Test smart API management
-python3 -c "
-import sys; sys.path.insert(0, 'src')
-from sports_betting.data.collectors.smart_api_manager import SmartApiManager
-from sports_betting.database import get_session
-manager = SmartApiManager(get_session())
-status = manager.get_usage_stats()
-print(f'API usage: {status[\"requests_used\"]}/{status[\"monthly_limit\"]}')
-"
-```
+No same-game data is used to prevent data leakage.
 
-## System Capabilities
+## Configuration
 
-### 🎯 **Ready Now (Core System)**
-- ✅ **Parlay Mathematics**: Complete correlation analysis and EV calculations
-- ✅ **Reasoning Engine**: Detailed explanations for every bet recommendation
-- ✅ **Portfolio Optimization**: Kelly criterion sizing with risk management
-- ✅ **Same-Game Parlay Validation**: Sportsbook rule compliance
-- ✅ **Smart API Management**: Budget protection within free tier limits
-- ✅ **Multi-Source Data**: ESPN API, historical files, manual CSV integration
+### Environment Variables
 
-### 🚀 **Enhanced Features (With Dependencies)**
-- 📦 **ML Models**: XGBoost and Neural Networks for prop predictions
-- 📊 **Historical Data**: NFL statistics via nfl-data-py integration
-- 🔑 **Live Odds**: Real-time market data via Odds API
-- 🧠 **Advanced Reasoning**: Model-powered insights with confidence scores
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `ODDS_API_KEY` | The Odds API key | Yes |
+| `DATABASE_URL` | SQLite path (default: data/sports_betting.db) | No |
 
-### 💰 **Sample Output**
-```
-💎 KC Same-Game Parlay (+485, 8.7% EV)
-   Recommended Bet: $285 (2.85% of $10k bankroll)
+### API Usage
 
-🎯 LEG 1: Travis Kelce Receiving Yards OVER 72.5 (-110)
-   📊 XGBoost Prediction: 78.2 yards (83% confidence)
-   📈 Reasoning: Kelce averages 78.5 yards vs teams ranked 25+ in
-      pass defense. DEN ranks 28th allowing 7.8 YPT to TEs.
-   ⚖️ Risk: Low risk - strong fundamentals and model agreement
+The Odds API free tier includes 500 requests/month. Each market fetch uses 1 request. The system caches odds to minimize API usage.
 
-🎯 LEG 2: Travis Kelce Receptions OVER 6.5 (-115)
-   📊 Prediction: 7.1 receptions (79% confidence)
-   📈 Reasoning: Strong 0.85 correlation with receiving yards.
-   ⚖️ Risk: Low risk - highly correlated with Leg 1
+## Analysis Reports
 
-🔗 CORRELATION ANALYSIS:
-   Average correlation: +0.68 (optimal range)
-   Joint probability boost: +12% vs independent calculation
+After running predictions, reports are saved to `docs/`:
 
-💰 EXECUTION: Execute based on 8.7% EV, high confidence (81%), 
-   optimal correlations, strong fundamentals
-```
+- `WEEK_13_ALL_PREDICTIONS.md` - All predictions and edges
+- `WEEK_13_ANALYSIS.md` - Detailed bias investigation and betting tiers
+- `WEEK_13_RESULTS.md` - Post-game performance analysis
 
 ## Development
 
 ```bash
-# Check core system capabilities
-python3 system_capabilities_demo.py
+# Run tests
+pytest tests/
 
-# Run enhanced system demo (requires dependencies)
-python3 enhanced_system_demo.py
+# Train models with fresh data
+python scripts/train_models_v2.py
 
-# Format code (if using development environment)
-black .
-isort .
-
-# Type checking
-mypy src/
+# Test results collection with previous week
+python scripts/collect_results.py --test
 ```
+
+## Data Sources
+
+| Source | Data | Update Frequency |
+|--------|------|------------------|
+| nfl-data-py | Historical stats, weekly data | Weekly |
+| NFL Next Gen Stats | Advanced metrics | Weekly |
+| Pro Football Reference | Seasonal stats | Daily during season |
+| The Odds API | Live betting lines | Real-time |
+
+## Limitations
+
+- Models perform best for high-volume players with consistent roles
+- Predictions don't account for injuries announced after data collection
+- Weather and game script adjustments are not yet implemented
+- Backups and low-snap players have higher prediction variance
+
+## License
+
+MIT

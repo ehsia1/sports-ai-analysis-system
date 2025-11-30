@@ -25,6 +25,7 @@ alembic>=1.12.0
 click>=8.1.0
 rich>=13.5.0
 pydantic>=2.3.0
+pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
 pyyaml>=6.0
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Collect actual results and score Week 13 predictions.
+Collect actual results and score predictions.
 
-Run this after games complete (Monday Dec 2, 2025 or later).
+Run this after games complete (typically Tuesday after Monday Night Football).
 """
 import sys
 from pathlib import Path
@@ -10,10 +10,17 @@ import pandas as pd
 import numpy as np
 import sqlite3
 from datetime import datetime
+import argparse
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.sports_betting.config import get_settings
+from src.sports_betting.utils import get_logger
+
 import nfl_data_py as nfl
+
+logger = get_logger(__name__)
+settings = get_settings()
 
 
 def normalize_name(name: str) -> str:
@@ -27,12 +34,23 @@ def normalize_name(name: str) -> str:
     return ' '.join(name.split())
 
 
-def load_predictions_from_db() -> pd.DataFrame:
-    """Load our predictions and props from database."""
-    conn = sqlite3.connect('data/sports_betting.db')
+def get_current_week() -> tuple[int, int]:
+    """Get current NFL season and week.
 
-    # Get all Week 13 props
-    props = pd.read_sql("""
+    TODO: Move to utils/nfl_schedule.py in Phase 2
+    """
+    season = settings.current_season
+    week = 13  # Will be dynamic in Phase 2
+    logger.debug(f"Using season {season}, week {week}")
+    return season, week
+
+
+def load_predictions_from_db(start_date: str, end_date: str) -> pd.DataFrame:
+    """Load our predictions and props from database."""
+    db_path = settings.db_path
+    conn = sqlite3.connect(str(db_path))
+
+    props = pd.read_sql(f"""
         SELECT
             p.name as player_name,
             p.position,
@@ -47,55 +65,56 @@ def load_predictions_from_db() -> pd.DataFrame:
         JOIN games g ON pr.game_id = g.id
         JOIN teams t1 ON g.away_team_id = t1.id
         JOIN teams t2 ON g.home_team_id = t2.id
-        WHERE g.game_date >= '2025-11-30'
-          AND g.game_date <= '2025-12-02'
+        WHERE g.game_date >= '{start_date}'
+          AND g.game_date <= '{end_date}'
     """, conn)
     conn.close()
 
+    logger.debug(f"Loaded {len(props)} props from database")
     return props
 
 
-def fetch_week_stats(week: int = 13) -> dict:
+def fetch_week_stats(week: int, season: int) -> dict:
     """Fetch actual stats for a specific week from NGS."""
-    print(f"\nFetching Week {week} actual stats from NGS...")
+    logger.info(f"Fetching Week {week} actual stats from NGS...")
 
     stats = {}
 
-    # NGS Receiving (has receptions and yards)
+    # NGS Receiving
     try:
-        ngs_rec = nfl.import_ngs_data('receiving', [2025])
+        ngs_rec = nfl.import_ngs_data('receiving', [season])
         week_rec = ngs_rec[ngs_rec['week'] == week]
         if len(week_rec) > 0:
             stats['ngs_receiving'] = week_rec
-            print(f"  ✓ NGS receiving: {len(week_rec)} records")
+            logger.info(f"  NGS receiving: {len(week_rec)} records")
         else:
-            print(f"  ⏳ NGS receiving: Week {week} not available yet")
+            logger.warning(f"  NGS receiving: Week {week} not available yet")
     except Exception as e:
-        print(f"  ✗ NGS receiving: {e}")
+        logger.error(f"  NGS receiving failed: {e}")
 
-    # NGS Rushing (has rush_yards)
+    # NGS Rushing
     try:
-        ngs_rush = nfl.import_ngs_data('rushing', [2025])
+        ngs_rush = nfl.import_ngs_data('rushing', [season])
         week_rush = ngs_rush[ngs_rush['week'] == week]
         if len(week_rush) > 0:
             stats['ngs_rushing'] = week_rush
-            print(f"  ✓ NGS rushing: {len(week_rush)} records")
+            logger.info(f"  NGS rushing: {len(week_rush)} records")
         else:
-            print(f"  ⏳ NGS rushing: Week {week} not available yet")
+            logger.warning(f"  NGS rushing: Week {week} not available yet")
     except Exception as e:
-        print(f"  ✗ NGS rushing: {e}")
+        logger.error(f"  NGS rushing failed: {e}")
 
-    # NGS Passing (has pass_yards)
+    # NGS Passing
     try:
-        ngs_pass = nfl.import_ngs_data('passing', [2025])
+        ngs_pass = nfl.import_ngs_data('passing', [season])
         week_pass = ngs_pass[ngs_pass['week'] == week]
         if len(week_pass) > 0:
             stats['ngs_passing'] = week_pass
-            print(f"  ✓ NGS passing: {len(week_pass)} records")
+            logger.info(f"  NGS passing: {len(week_pass)} records")
         else:
-            print(f"  ⏳ NGS passing: Week {week} not available yet")
+            logger.warning(f"  NGS passing: Week {week} not available yet")
     except Exception as e:
-        print(f"  ✗ NGS passing: {e}")
+        logger.error(f"  NGS passing failed: {e}")
 
     return stats
 
@@ -104,8 +123,6 @@ def get_player_stat(player_name: str, market: str, stats: dict) -> float:
     """Get actual stat for a player from available data sources."""
     norm_name = normalize_name(player_name)
 
-    # Map market to stat columns
-    # NGS is primary source (has actual stats), PFR weekly only has advanced metrics
     market_config = {
         'player_reception_yds': {
             'sources': ['ngs_receiving'],
@@ -154,73 +171,26 @@ def get_player_stat(player_name: str, market: str, stats: dict) -> float:
     return np.nan
 
 
-def score_predictions(props: pd.DataFrame, stats: dict) -> pd.DataFrame:
-    """Score each prediction against actual results."""
-    results = []
+def load_our_bets(start_date: str, end_date: str, season: int) -> pd.DataFrame:
+    """Load our actual betting recommendations."""
+    logger.info("Loading betting recommendations...")
 
-    for _, row in props.iterrows():
-        actual = get_player_stat(row['player_name'], row['market'], stats)
+    pfr_rec = nfl.import_seasonal_pfr('rec', [season])
+    pfr_rush = nfl.import_seasonal_pfr('rush', [season])
 
-        if pd.isna(actual):
-            result = 'NO_DATA'
-            won = None
-            profit = 0
-        else:
-            # Determine bet direction based on season average vs line
-            # For now, we'll use the line to determine if it's over/under
-            # In practice, we'd load our actual predictions
-
-            # Placeholder - will be updated with actual prediction logic
-            result = 'PENDING'
-            won = None
-            profit = 0
-
-        results.append({
-            'player_name': row['player_name'],
-            'market': row['market'],
-            'line': row['line'],
-            'over_odds': row['over_odds'],
-            'under_odds': row['under_odds'],
-            'matchup': row['matchup'],
-            'actual': actual,
-            'result': result,
-            'won': won,
-            'profit': profit
-        })
-
-    return pd.DataFrame(results)
-
-
-def load_our_bets() -> pd.DataFrame:
-    """Load our actual betting recommendations from the analysis file."""
-    # Read the analysis markdown and parse the betting tables
-    # For now, regenerate predictions
-
-    import pickle
-
-    # Load PFR data
-    pfr_rec = nfl.import_seasonal_pfr('rec', [2025])
-    pfr_rush = nfl.import_seasonal_pfr('rush', [2025])
-
-    def normalize(name):
-        if pd.isna(name): return ''
-        name = str(name).lower().strip()
-        for s in [' jr.', ' jr', ' sr.', ' sr', ' iii', ' ii', ' iv']:
-            name = name.replace(s, '')
-        return name.replace("'", "").replace(".", "").replace("-", " ").strip()
-
-    pfr_rec['norm'] = pfr_rec['player'].apply(normalize)
+    pfr_rec['norm'] = pfr_rec['player'].apply(normalize_name)
     pfr_rec['rec_per_game'] = pfr_rec['rec'] / pfr_rec['g'].clip(lower=1)
     pfr_rec['rec_ypg'] = pfr_rec['yds'] / pfr_rec['g'].clip(lower=1)
-    pfr_rush['norm'] = pfr_rush['player'].apply(normalize)
+    pfr_rush['norm'] = pfr_rush['player'].apply(normalize_name)
     pfr_rush['rush_ypg'] = pfr_rush['yds'] / pfr_rush['g'].clip(lower=1)
 
-    conn = sqlite3.connect('data/sports_betting.db')
+    db_path = settings.db_path
+    conn = sqlite3.connect(str(db_path))
 
     all_bets = []
 
     # Receptions
-    props = pd.read_sql("""
+    props = pd.read_sql(f"""
         SELECT p.name, pr.line, pr.over_odds, pr.under_odds,
                t1.abbreviation || ' @ ' || t2.abbreviation as matchup
         FROM props pr
@@ -229,14 +199,14 @@ def load_our_bets() -> pd.DataFrame:
         JOIN teams t1 ON g.away_team_id = t1.id
         JOIN teams t2 ON g.home_team_id = t2.id
         WHERE pr.market = 'player_receptions'
-          AND g.game_date >= '2025-11-30' AND g.game_date <= '2025-12-02'
+          AND g.game_date >= '{start_date}' AND g.game_date <= '{end_date}'
         GROUP BY p.name
     """, conn)
-    props['norm'] = props['name'].apply(normalize)
+    props['norm'] = props['name'].apply(normalize_name)
     merged = props.merge(pfr_rec[['norm', 'rec_per_game', 'g']], on='norm', how='left')
     merged = merged.dropna(subset=['rec_per_game'])
     merged = merged[merged['g'] >= 3]
-    merged['predicted'] = merged['rec_per_game']  # Using season avg as proxy
+    merged['predicted'] = merged['rec_per_game']
     merged['edge_pct'] = (merged['predicted'] - merged['line']) / merged['line'] * 100
     merged['bet'] = np.where(merged['predicted'] > merged['line'], 'OVER', 'UNDER')
     merged['odds'] = np.where(merged['bet'] == 'OVER', merged['over_odds'], merged['under_odds'])
@@ -244,7 +214,7 @@ def load_our_bets() -> pd.DataFrame:
     all_bets.append(merged[['name', 'matchup', 'market', 'line', 'predicted', 'edge_pct', 'bet', 'odds']])
 
     # Rushing Yards
-    props = pd.read_sql("""
+    props = pd.read_sql(f"""
         SELECT p.name, pr.line, pr.over_odds, pr.under_odds,
                t1.abbreviation || ' @ ' || t2.abbreviation as matchup
         FROM props pr
@@ -253,10 +223,10 @@ def load_our_bets() -> pd.DataFrame:
         JOIN teams t1 ON g.away_team_id = t1.id
         JOIN teams t2 ON g.home_team_id = t2.id
         WHERE pr.market = 'player_rush_yds'
-          AND g.game_date >= '2025-11-30' AND g.game_date <= '2025-12-02'
+          AND g.game_date >= '{start_date}' AND g.game_date <= '{end_date}'
         GROUP BY p.name
     """, conn)
-    props['norm'] = props['name'].apply(normalize)
+    props['norm'] = props['name'].apply(normalize_name)
     merged = props.merge(pfr_rush[['norm', 'rush_ypg', 'g']], on='norm', how='left')
     merged = merged.dropna(subset=['rush_ypg'])
     merged = merged[merged['g'] >= 3]
@@ -268,7 +238,7 @@ def load_our_bets() -> pd.DataFrame:
     all_bets.append(merged[['name', 'matchup', 'market', 'line', 'predicted', 'edge_pct', 'bet', 'odds']])
 
     # Receiving Yards
-    props = pd.read_sql("""
+    props = pd.read_sql(f"""
         SELECT p.name, pr.line, pr.over_odds, pr.under_odds,
                t1.abbreviation || ' @ ' || t2.abbreviation as matchup
         FROM props pr
@@ -277,10 +247,10 @@ def load_our_bets() -> pd.DataFrame:
         JOIN teams t1 ON g.away_team_id = t1.id
         JOIN teams t2 ON g.home_team_id = t2.id
         WHERE pr.market = 'player_reception_yds'
-          AND g.game_date >= '2025-11-30' AND g.game_date <= '2025-12-02'
+          AND g.game_date >= '{start_date}' AND g.game_date <= '{end_date}'
         GROUP BY p.name
     """, conn)
-    props['norm'] = props['name'].apply(normalize)
+    props['norm'] = props['name'].apply(normalize_name)
     merged = props.merge(pfr_rec[['norm', 'rec_ypg', 'g']], on='norm', how='left')
     merged = merged.dropna(subset=['rec_ypg'])
     merged = merged[merged['g'] >= 3]
@@ -296,9 +266,11 @@ def load_our_bets() -> pd.DataFrame:
     combined = pd.concat(all_bets, ignore_index=True)
     combined['abs_edge'] = combined['edge_pct'].abs()
 
-    # Filter to quality bets (10%+ edge)
-    quality = combined[combined['abs_edge'] >= 10].copy()
+    # Filter to quality bets using settings threshold
+    min_edge = settings.min_edge_pct
+    quality = combined[combined['abs_edge'] >= min_edge].copy()
 
+    logger.info(f"  Loaded {len(quality)} quality bets (>= {min_edge}% edge)")
     return quality
 
 
@@ -353,13 +325,12 @@ def score_bets(bets: pd.DataFrame, stats: dict) -> pd.DataFrame:
     return pd.DataFrame(results)
 
 
-def generate_report(scored: pd.DataFrame) -> str:
+def generate_report(scored: pd.DataFrame, week: int, season: int) -> str:
     """Generate performance report."""
-    # Filter to scored bets only
     scored_only = scored[scored['result'].isin(['WIN', 'LOSS'])]
 
     if len(scored_only) == 0:
-        return "No results available yet. Run this after Week 13 games complete."
+        return f"No results available yet for Week {week}."
 
     wins = (scored_only['result'] == 'WIN').sum()
     losses = (scored_only['result'] == 'LOSS').sum()
@@ -369,7 +340,7 @@ def generate_report(scored: pd.DataFrame) -> str:
     total_profit = scored_only['profit'].sum()
     roi = total_profit / total * 100 if total > 0 else 0
 
-    report = f"""# Week 13 (2025) Results Report
+    report = f"""# Week {week} ({season}) Results Report
 
 Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 
@@ -404,6 +375,8 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 
     for direction in ['OVER', 'UNDER']:
         subset = scored_only[scored_only['bet'] == direction]
+        if len(subset) == 0:
+            continue
         d_wins = (subset['result'] == 'WIN').sum()
         d_total = len(subset)
         d_profit = subset['profit'].sum()
@@ -418,10 +391,9 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
     report += "|--------|-----|--------|------|------|--------|------|------|-----|\n"
 
     for _, row in scored_only.sort_values('profit', ascending=False).iterrows():
-        emoji = '✅' if row['result'] == 'WIN' else '❌'
+        emoji = 'WIN' if row['result'] == 'WIN' else 'LOSS'
         report += f"| {emoji} | {row['bet']} | {row['player_name']} | {row['line']:.1f} | {row['predicted']:.1f} | {row['actual']:.1f} | {row['edge_pct']:+.0f}% | {row['odds']:+.0f} | {row['profit']:+.2f} |\n"
 
-    # Bets without data
     no_data = scored[scored['result'] == 'NO_DATA']
     if len(no_data) > 0:
         report += f"\n## Bets Without Data ({len(no_data)})\n\n"
@@ -433,58 +405,68 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 
 
 def main():
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Collect and score Week 13 results')
-    parser.add_argument('--week', type=int, default=13, help='Week number to collect (default: 13)')
+    parser = argparse.ArgumentParser(description='Collect and score results')
+    parser.add_argument('--week', type=int, default=13, help='Week number')
+    parser.add_argument('--season', type=int, default=None, help='Season year')
     parser.add_argument('--test', action='store_true', help='Test with previous week data')
     args = parser.parse_args()
 
+    season = args.season or settings.current_season
     week = args.week
     if args.test:
-        week = 12  # Use Week 12 for testing
+        week = week - 1  # Use previous week for testing
+        logger.info(f"Test mode: using week {week}")
 
-    print("="*60)
-    print(f"WEEK {week} RESULTS COLLECTION")
-    print("="*60)
+    logger.info("=" * 50)
+    logger.info(f"WEEK {week} RESULTS COLLECTION")
+    logger.info("=" * 50)
+
+    # Calculate date range for the week
+    # TODO: Move to Phase 2 utils/nfl_schedule.py
+    # For now, use approximate dates
+    start_date = '2025-11-30'
+    end_date = '2025-12-02'
+    if week == 12:
+        start_date = '2025-11-23'
+        end_date = '2025-11-28'
 
     # Load our bets
-    print("\nLoading our betting recommendations...")
-    bets = load_our_bets()
-    print(f"  Loaded {len(bets)} quality bets")
+    bets = load_our_bets(start_date, end_date, season)
+
+    if len(bets) == 0:
+        logger.warning("No bets found for this week")
+        return 1
 
     # Fetch actual stats
-    stats = fetch_week_stats(week)
+    stats = fetch_week_stats(week, season)
 
     if not stats:
-        print(f"\n⚠️  No Week {week} data available yet.")
-        if week == 13:
-            print("   Run this script after games complete (Monday Dec 2, 2025)")
-        return
+        logger.warning(f"No Week {week} data available yet")
+        logger.info("Run this script after games complete")
+        return 1
 
     # Score bets
-    print("\nScoring bets...")
+    logger.info("Scoring bets...")
     scored = score_bets(bets, stats)
 
     scored_count = scored['result'].isin(['WIN', 'LOSS']).sum()
-    print(f"  Scored: {scored_count}/{len(scored)} bets")
+    logger.info(f"  Scored: {scored_count}/{len(scored)} bets")
 
     if scored_count == 0:
-        print(f"\n⚠️  No Week {week} results found in data.")
-        print("   Data sources may not have updated yet.")
-        if week == 13:
-            print("   Try again later on Monday Dec 2, 2025")
-        return
+        logger.warning(f"No Week {week} results found in data")
+        logger.info("Data sources may not have updated yet")
+        return 1
 
     # Generate report
-    report = generate_report(scored)
+    report = generate_report(scored, week, season)
 
     # Save report
-    report_path = Path(f'docs/WEEK_{week}_RESULTS.md')
+    report_path = settings.data_dir.parent / 'docs' / f'WEEK_{week}_RESULTS.md'
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, 'w') as f:
         f.write(report)
 
-    print(f"\n✓ Report saved to {report_path}")
+    logger.info(f"Report saved to {report_path}")
 
     # Print summary
     scored_only = scored[scored['result'].isin(['WIN', 'LOSS'])]
@@ -492,13 +474,15 @@ def main():
     total = len(scored_only)
     profit = scored_only['profit'].sum()
 
-    print(f"\n{'='*60}")
-    print("SUMMARY")
-    print(f"{'='*60}")
-    print(f"Record: {wins}-{total-wins} ({wins/total*100:.1f}% win rate)")
-    print(f"Profit: {profit:+.2f} units")
-    print(f"ROI: {profit/total*100:+.1f}%")
+    logger.info("=" * 50)
+    logger.info("SUMMARY")
+    logger.info(f"  Record: {wins}-{total-wins} ({wins/total*100:.1f}% win rate)")
+    logger.info(f"  Profit: {profit:+.2f} units")
+    logger.info(f"  ROI: {profit/total*100:+.1f}%")
+    logger.info("=" * 50)
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

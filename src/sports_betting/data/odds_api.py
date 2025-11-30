@@ -4,14 +4,14 @@ import os
 import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-import logging
 from pathlib import Path
 import json
 
 from ..database import get_session
 from ..database.models import Prop, Book, Player, Game
+from ..utils import get_logger, retry_with_backoff
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def american_to_decimal(american_odds: int) -> float:
@@ -84,8 +84,7 @@ class OddsAPIClient:
 
         try:
             logger.info(f"Making request to {endpoint}")
-            response = requests.get(url, params=params, timeout=30)
-            response.raise_for_status()
+            response = self._execute_request(url, params)
 
             # Track credit usage from headers
             self.credits_remaining = response.headers.get("x-requests-remaining")
@@ -100,8 +99,20 @@ class OddsAPIClient:
             return response.json()
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"API request failed: {e}")
+            logger.error(f"API request failed after retries: {e}")
             return None
+
+    @retry_with_backoff(
+        max_retries=3,
+        initial_delay=1.0,
+        backoff_factor=2.0,
+        exceptions=(requests.exceptions.RequestException,),
+    )
+    def _execute_request(self, url: str, params: Dict) -> requests.Response:
+        """Execute HTTP request with retry logic."""
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+        return response
 
     def get_sports(self) -> List[Dict]:
         """Get list of available sports (FREE - no credits used)."""

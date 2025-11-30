@@ -7,6 +7,7 @@ import logging
 
 from ..database import get_session
 from ..database.models import Prop, Player, Game, Prediction, Edge
+from ..data.weather import get_weather_service, GameWeather
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +142,10 @@ class EdgeCalculator:
 
         edges = []
 
+        # Get weather data for the week
+        weather_service = get_weather_service()
+        week_weather = weather_service.get_weather_for_week(season, week)
+
         with get_session() as session:
             # Get all games for this week
             games = session.query(Game).filter_by(
@@ -150,6 +155,10 @@ class EdgeCalculator:
             ).all()
 
             for game in games:
+                # Get weather for this game
+                game_key = f"{game.away_team.abbreviation}@{game.home_team.abbreviation}"
+                weather = week_weather.get(game_key)
+
                 # Get props for this game
                 props = session.query(Prop).filter_by(
                     game_id=game.id,
@@ -168,10 +177,19 @@ class EdgeCalculator:
                     if not prediction:
                         continue
 
+                    # Apply weather adjustment to confidence for passing/receiving
+                    adjusted_confidence = prediction.confidence
+                    weather_warning = None
+                    if weather and weather.is_bad_weather:
+                        # Reduce confidence for weather-sensitive stats
+                        if prop.market in ('player_pass_yds', 'player_reception_yds'):
+                            adjusted_confidence *= weather.weather_impact
+                            weather_warning = weather.summary
+
                     # Calculate edge
                     edge_analysis = self.calculate_edge(
                         model_prediction=prediction.prediction,
-                        model_confidence=prediction.confidence,
+                        model_confidence=adjusted_confidence,
                         market_line=prop.line,
                         over_odds=prop.over_odds,
                         under_odds=prop.under_odds
@@ -190,6 +208,8 @@ class EdgeCalculator:
                             'player': player.name,
                             'position': player.position,
                             'market': prop.market,
+                            'weather': weather.summary if weather else None,
+                            'weather_warning': weather_warning,
                             **edge_analysis,
                         }
 
@@ -305,9 +325,26 @@ class EdgeCalculator:
                 by_market[market] = []
             by_market[market].append(edge)
 
+        # Collect weather warnings (any game with precipitation or weather_warning)
+        weather_games = {}
+        for edge in edges:
+            weather_str = edge.get('weather', '')
+            if edge.get('weather_warning') or any(w in str(weather_str).lower() for w in ['snow', 'rain']):
+                game = edge['game']
+                if game not in weather_games:
+                    weather_games[game] = weather_str or edge.get('weather_warning')
+
         report = []
         report.append(f"BETTING EDGES - {len(edges)} opportunities found")
         report.append("")
+
+        # Weather warnings section
+        if weather_games:
+            report.append("⚠️  WEATHER WARNINGS:")
+            for game, weather in weather_games.items():
+                report.append(f"  {game}: {weather}")
+            report.append("  (Pass/rec confidence reduced for affected games)")
+            report.append("")
 
         # Summary by market
         report.append("By Market:")
@@ -330,9 +367,14 @@ class EdgeCalculator:
                 edge_pct = edge['under']['edge_pct']
                 odds = edge['under']['odds']
 
+            # Add weather flag (show for any bad weather game)
+            weather_str = edge.get('weather', '')
+            has_bad_weather = any(w in str(weather_str).lower() for w in ['snow', 'rain']) or edge.get('weather_warning')
+            wx = '❄' if has_bad_weather else ''
+
             table_edges.append({
                 'side': side,
-                'player': edge['player'][:18],  # Truncate long names
+                'player': edge['player'][:16],  # Truncate long names
                 'market': edge['market'].replace('player_', '').replace('_yds', '').replace('_', ' ')[:8],
                 'line': edge['line'],
                 'pred': edge['prediction'],
@@ -340,6 +382,8 @@ class EdgeCalculator:
                 'edge': edge_pct,
                 'odds': odds,
                 'conf': edge['model_confidence'],
+                'wx': wx,
+                'game': edge['game'],
             })
 
         # Sort by EV descending
@@ -348,13 +392,13 @@ class EdgeCalculator:
         # Print table header
         report.append(f"Top {min(top_n, len(table_edges))} Edges by EV:")
         report.append("")
-        report.append(f"{'Side':<6} {'Player':<18} {'Market':<8} {'Line':>6} {'Pred':>6} {'EV':>7} {'Edge':>6} {'Odds':>6}")
-        report.append("-" * 72)
+        report.append(f"{'Wx':<2} {'Side':<6} {'Player':<16} {'Market':<8} {'Line':>6} {'Pred':>6} {'EV':>7} {'Edge':>6} {'Odds':>6}")
+        report.append("-" * 76)
 
         # Print top edges
         for e in table_edges[:top_n]:
             report.append(
-                f"{e['side']:<6} {e['player']:<18} {e['market']:<8} "
+                f"{e['wx']:<2} {e['side']:<6} {e['player']:<16} {e['market']:<8} "
                 f"{e['line']:>6.1f} {e['pred']:>6.1f} {e['ev']:>+6.1f}% {e['edge']:>+5.1f}% {e['odds']:>+5d}"
             )
 

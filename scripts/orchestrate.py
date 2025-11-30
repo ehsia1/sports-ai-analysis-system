@@ -144,6 +144,65 @@ def cmd_full(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     return 0 if result.success else 1
 
 
+def cmd_weather(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
+    """Set or fetch weather for games."""
+    from src.sports_betting.data.weather import set_game_weather, get_weather_service
+
+    ws = get_weather_service()
+
+    # If fetching all weather
+    if args.fetch_all:
+        status = orchestrator.get_status()
+        season = args.season or status['season']
+        week = args.week or status['week']
+
+        print()
+        print(f"Fetching weather for {season} Week {week}...")
+        print()
+
+        results = ws.fetch_all_outdoor_games(season, week)
+
+        print(f"Weather for {len(results)} games:")
+        print()
+        for key, w in sorted(results.items()):
+            status = ""
+            if w.is_dome:
+                status = " (dome)"
+            elif w.is_bad_weather:
+                status = f" ⚠️ BAD WEATHER (-{(1 - w.weather_impact)*100:.0f}% confidence)"
+            print(f"  {key}: {w.summary}{status}")
+        print()
+        return 0
+
+    # Manual weather set
+    if not args.away_team or not args.home_team or not args.conditions:
+        print("Error: Must provide away_team, home_team, and conditions")
+        print("  Or use --fetch to fetch weather for all games")
+        return 1
+
+    set_game_weather(
+        home_team=args.home_team.upper(),
+        away_team=args.away_team.upper(),
+        conditions=args.conditions,
+        temp_f=args.temp,
+        wind_mph=args.wind,
+    )
+
+    weather = ws._manual_weather
+    print()
+    print("Weather set successfully!")
+    print()
+    for key, w in weather.items():
+        print(f"  {key}: {w.summary}")
+        if w.is_bad_weather:
+            print(f"    → Bad weather: confidence will be reduced by {(1 - w.weather_impact)*100:.0f}%")
+    print()
+    print("Run 'orchestrate.py stage calculate_edges' to recalculate with weather adjustments")
+    print()
+
+    return 0
+
+
 def cmd_health(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     """Run health checks."""
     from src.sports_betting.monitoring import run_health_check
@@ -300,6 +359,41 @@ Examples:
         help="Number of top edges to display (default: 20)",
     )
 
+    # Weather command
+    weather = subparsers.add_parser("weather", help="Set or fetch weather for games")
+    weather.add_argument(
+        "away_team",
+        nargs="?",
+        help="Away team abbreviation (e.g., SF)",
+    )
+    weather.add_argument(
+        "home_team",
+        nargs="?",
+        help="Home team abbreviation (e.g., CLE)",
+    )
+    weather.add_argument(
+        "conditions",
+        nargs="?",
+        choices=["clear", "rain", "snow", "wind"],
+        help="Weather conditions",
+    )
+    weather.add_argument(
+        "--temp",
+        type=float,
+        help="Temperature in Fahrenheit",
+    )
+    weather.add_argument(
+        "--wind",
+        type=float,
+        help="Wind speed in mph",
+    )
+    weather.add_argument(
+        "--fetch",
+        dest="fetch_all",
+        action="store_true",
+        help="Fetch live weather from Weather.gov for all outdoor games",
+    )
+
     args = parser.parse_args()
 
     # Create orchestrator
@@ -318,6 +412,8 @@ Examples:
         return cmd_health(orchestrator, args)
     elif args.command == "stage":
         return cmd_stage(orchestrator, args)
+    elif args.command == "weather":
+        return cmd_weather(orchestrator, args)
     else:
         parser.print_help()
         return 1

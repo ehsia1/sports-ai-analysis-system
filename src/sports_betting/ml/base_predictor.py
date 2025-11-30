@@ -133,10 +133,12 @@ class BaseStatPredictor(ABC):
         X = predictions_df[self.features].fillna(0)
         predictions = self.model.predict(X.values)
 
-        # Build results
+        # Build results - use player_display_name for full names (matches our Player table)
+        name_col = "player_display_name" if "player_display_name" in predictions_df.columns else "player_name"
         results = predictions_df[
-            ["player_name", "player_id", "position", "recent_team"]
+            [name_col, "player_id", "position", "recent_team"]
         ].copy()
+        results = results.rename(columns={name_col: "player_name"})
         results["predicted"] = predictions
         results["stat_type"] = self.stat_type
 

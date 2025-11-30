@@ -113,6 +113,14 @@ class OddsCollectionStage(WorkflowStage):
     description = "Fetch player props from The Odds API"
     required_phases = [GamePhase.PRE_GAME, GamePhase.IN_PROGRESS]
 
+    # Default markets to fetch
+    DEFAULT_MARKETS = [
+        "player_reception_yds",
+        "player_rush_yds",
+        "player_pass_yds",
+        "player_receptions",
+    ]
+
     def execute(self, season: int, week: int, **kwargs) -> StageResult:
         """
         Collect odds for the specified week.
@@ -121,16 +129,16 @@ class OddsCollectionStage(WorkflowStage):
             season: NFL season
             week: Week number
             force: Force fetch even if cached (default False)
-            max_events: Maximum events to fetch (default 5)
-            markets: Markets to fetch (default ['player_reception_yds'])
+            max_events: Maximum events to fetch (default 10)
+            markets: Markets to fetch (default all player props)
 
         Returns:
             StageResult with props_stored, credits_used, credits_remaining
         """
         started_at = datetime.now()
         force = kwargs.get("force", False)
-        max_events = kwargs.get("max_events", 5)
-        markets = kwargs.get("markets", ["player_reception_yds"])
+        max_events = kwargs.get("max_events", 10)
+        markets = kwargs.get("markets", self.DEFAULT_MARKETS)
 
         self.logger.info(f"Starting odds collection for {season} Week {week}")
 
@@ -176,7 +184,7 @@ class OddsCollectionStage(WorkflowStage):
 
             # Fetch odds
             odds_data = client.fetch_and_cache_daily_odds(
-                markets=markets, event_ids=event_ids
+                markets=markets, event_ids=event_ids, force=force
             )
 
             if not odds_data:

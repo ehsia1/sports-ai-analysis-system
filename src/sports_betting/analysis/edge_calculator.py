@@ -159,9 +159,8 @@ class EdgeCalculator:
                 ).all()
 
                 for prop in props:
-                    # Get model prediction
+                    # Get model prediction - match by player and market (predictions may have different game_id)
                     prediction = session.query(Prediction).filter_by(
-                        game_id=game.id,
                         player_id=prop.player_id,
                         market=prop.market
                     ).order_by(Prediction.created_at.desc()).first()
@@ -209,16 +208,23 @@ class EdgeCalculator:
     def store_edges_in_database(self, edges: List[Dict]):
         """Store identified edges in the database for tracking."""
         with get_session() as session:
+            stored_count = 0
+            updated_count = 0
+
             for edge_data in edges:
                 # Determine which side to bet
                 if edge_data['over']['should_bet']:
                     bet_side = 'over'
                     edge_value = edge_data['over']['edge']
                     ev = edge_data['over']['ev']
+                    odds = edge_data['over']['odds']
+                    fair_prob = edge_data['over']['market_probability']
                 elif edge_data['under']['should_bet']:
                     bet_side = 'under'
                     edge_value = edge_data['under']['edge']
                     ev = edge_data['under']['ev']
+                    odds = edge_data['under']['odds']
+                    fair_prob = edge_data['under']['market_probability']
                 else:
                     continue
 
@@ -238,25 +244,53 @@ class EdgeCalculator:
                 if not prop:
                     continue
 
-                # Store edge
-                edge = Edge(
-                    prop_id=prop.id,
+                # Calculate Kelly fraction (simplified: edge / (odds - 1))
+                decimal_odds = self.american_to_decimal(odds)
+                kelly = edge_value / (decimal_odds - 1) if decimal_odds > 1 else 0
+
+                # Check if edge already exists
+                existing = session.query(Edge).filter_by(
                     game_id=prop.game_id,
                     player_id=prop.player_id,
                     book_id=prop.book_id,
                     market=prop.market,
-                    recommended_side=bet_side,
-                    model_prediction=edge_data['prediction'],
-                    market_line=edge_data['line'],
-                    edge_value=edge_value,
-                    expected_value=ev,
-                    model_confidence=edge_data['model_confidence'],
-                    status='pending',
-                )
-                session.add(edge)
+                    side=bet_side,
+                ).first()
+
+                if existing:
+                    # Update existing edge
+                    existing.offered_line = edge_data['line']
+                    existing.offered_odds = odds
+                    existing.fair_line = edge_data['prediction']
+                    existing.fair_probability = fair_prob
+                    existing.expected_value = ev
+                    existing.kelly_fraction = kelly
+                    existing.confidence = edge_data['model_confidence']
+                    existing.reasoning = f"Model predicts {edge_data['prediction']:.1f} vs line {edge_data['line']}"
+                    existing.created_at = datetime.now()
+                    updated_count += 1
+                else:
+                    # Store new edge
+                    edge = Edge(
+                        game_id=prop.game_id,
+                        player_id=prop.player_id,
+                        book_id=prop.book_id,
+                        market=prop.market,
+                        side=bet_side,
+                        offered_line=edge_data['line'],
+                        offered_odds=odds,
+                        fair_line=edge_data['prediction'],
+                        fair_probability=fair_prob,
+                        expected_value=ev,
+                        kelly_fraction=kelly,
+                        confidence=edge_data['model_confidence'],
+                        reasoning=f"Model predicts {edge_data['prediction']:.1f} vs line {edge_data['line']}",
+                    )
+                    session.add(edge)
+                    stored_count += 1
 
             session.commit()
-            logger.info(f"Stored {len(edges)} edges in database")
+            logger.info(f"Stored {stored_count} new edges, updated {updated_count} existing")
 
     def format_edge_report(self, edges: List[Dict]) -> str:
         """Format edges into a readable report."""

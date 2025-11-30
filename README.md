@@ -30,36 +30,39 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Set Up API Key
+### 2. Set Up Environment
 
 ```bash
 cp .env.example .env
-# Add your Odds API key: ODDS_API_KEY=your_key_here
+# Required: ODDS_API_KEY=your_key_here
+# Optional: DISCORD_WEBHOOK_URL=your_webhook_here
 ```
 
 Get a free API key at [The Odds API](https://the-odds-api.com/).
 
-### 3. Train Models
+### 3. Train Models (one-time)
 
 ```bash
 python scripts/train_models_v2.py
 ```
 
-### 4. Collect Odds & Generate Predictions
+### 4. Weekly Workflow
 
 ```bash
-# Fetch this week's player props
-python scripts/collect_daily_odds.py
+# Check system status and current week
+python scripts/orchestrate.py status
 
-# Generate predictions for all stat types
-python scripts/predict_week13_all.py
+# BEFORE GAMES: Collect odds, generate predictions, find edges
+python scripts/orchestrate.py pre-game
+
+# AFTER GAMES: Collect results and score predictions
+python scripts/orchestrate.py post-game
+
+# Check system health
+python scripts/orchestrate.py health
 ```
 
-### 5. After Games - Collect Results
-
-```bash
-python scripts/collect_results.py
-```
+The orchestrator automatically detects the current NFL week and handles all stages.
 
 ## Project Structure
 
@@ -67,53 +70,51 @@ python scripts/collect_results.py
 sports-betting/
 ├── src/sports_betting/
 │   ├── ml/                    # ML models and predictors
-│   │   ├── receiving_yards.py # Adaptive receiving predictor
-│   │   └── __init__.py
-│   ├── data/                  # Data collection
-│   │   ├── odds_api.py        # The Odds API client
-│   │   └── collectors/        # NFL data collectors
+│   ├── data/                  # Data collection (Odds API, NFL data)
 │   ├── database/              # SQLite database models
-│   └── analysis/              # Edge calculation
+│   ├── analysis/              # Edge calculation
+│   ├── workflow/              # Orchestrator and stage management
+│   ├── notifications/         # Discord alerts
+│   └── monitoring/            # Health checks
 ├── scripts/
-│   ├── train_models_v2.py     # Train all prediction models
-│   ├── predict_week13_all.py  # Generate multi-stat predictions
-│   ├── collect_daily_odds.py  # Fetch odds from API
-│   └── collect_results.py     # Score predictions after games
+│   └── orchestrate.py         # Main CLI entry point
 ├── models/                    # Saved model files (.pkl)
 ├── data/                      # SQLite database
-└── docs/                      # Analysis reports
+└── tests/                     # 100 tests
 ```
 
 ## Usage Examples
 
-### Generate Predictions
-
-```python
-from src.sports_betting.ml import ReceivingYardsPredictor
-
-predictor = ReceivingYardsPredictor()
-predictions, diagnostics = predictor.predict_adaptive(2025, 13)
-print(predictions[['player_name', 'predicted_yards', 'confidence']])
-```
-
-### Find Betting Edges
+### Full Pre-Game Workflow
 
 ```bash
-# Run the full prediction pipeline
-python scripts/predict_week13_all.py
+python scripts/orchestrate.py pre-game
 
 # Output shows edges like:
 # OVER  Keon Coleman  Rec Yards  25.5  35.2  +38.1%  -118
 # UNDER Taysom Hill   Rush Yards 22.5  14.7  -34.7%  -110
 ```
 
-### Check API Usage
+### Run Individual Stages
 
-```python
-from src.sports_betting.data.odds_api import OddsAPIClient
+```bash
+# Just collect odds
+python scripts/orchestrate.py stage collect_odds
 
-client = OddsAPIClient()
-print(f"Remaining API credits: {client.remaining_requests}")
+# Just generate predictions
+python scripts/orchestrate.py stage generate_predictions
+
+# Override week number
+python scripts/orchestrate.py pre-game --week 14
+```
+
+### Check System Health
+
+```bash
+python scripts/orchestrate.py health
+
+# With Discord notification on issues
+python scripts/orchestrate.py health --notify
 ```
 
 ## Model Training
@@ -139,11 +140,24 @@ No same-game data is used to prevent data leakage.
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `ODDS_API_KEY` | The Odds API key | Yes |
+| `DISCORD_WEBHOOK_URL` | Discord webhook for alerts | No |
 | `DATABASE_URL` | SQLite path (default: data/sports_betting.db) | No |
+
+### Discord Notifications
+
+When configured, the system sends:
+- **Edge alerts** - High-confidence betting opportunities
+- **Weekly results** - Win/loss record and ROI
+- **Health alerts** - System issues (when using `--notify`)
 
 ### API Usage
 
-The Odds API free tier includes 500 requests/month. Each market fetch uses 1 request. The system caches odds to minimize API usage.
+The Odds API free tier includes 500 requests/month. Each player props fetch uses ~4 requests. The system caches odds to minimize API usage.
+
+Check remaining credits:
+```bash
+python scripts/orchestrate.py health
+```
 
 ## Analysis Reports
 
@@ -156,14 +170,14 @@ After running predictions, reports are saved to `docs/`:
 ## Development
 
 ```bash
-# Run tests
+# Run tests (100 tests)
 pytest tests/
 
 # Train models with fresh data
 python scripts/train_models_v2.py
 
-# Test results collection with previous week
-python scripts/collect_results.py --test
+# Check system health
+python scripts/orchestrate.py health
 ```
 
 ## Data Sources

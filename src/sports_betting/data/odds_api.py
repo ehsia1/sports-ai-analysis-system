@@ -1,12 +1,12 @@
 """The Odds API client with smart caching and credit tracking."""
 
-import os
 import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from pathlib import Path
 import json
 
+from ..config import get_settings
 from ..database import get_session
 from ..database.models import Prop, Book, Player, Game
 from ..utils import get_logger, retry_with_backoff
@@ -55,7 +55,8 @@ class OddsAPIClient:
 
     def __init__(self, api_key: Optional[str] = None):
         """Initialize the Odds API client."""
-        self.api_key = api_key or os.getenv("ODDS_API_KEY")
+        settings = get_settings()
+        self.api_key = api_key or settings.odds_api_key
         if not self.api_key:
             logger.warning("No ODDS_API_KEY found. Set in .env or pass to constructor.")
 
@@ -314,11 +315,11 @@ class OddsAPIClient:
                         away_team = session.query(Team).filter_by(name=away_team_name).first()
 
                         if home_team and away_team:
-                            # Query game by team IDs
+                            # Query game by team IDs - get most recent/upcoming game
                             game = session.query(Game).filter_by(
                                 home_team_id=home_team.id,
                                 away_team_id=away_team.id
-                            ).first()
+                            ).order_by(Game.game_date.desc()).first()
 
                         # If still not found, log warning
                         if not game:

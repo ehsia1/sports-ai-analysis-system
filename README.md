@@ -9,7 +9,9 @@ This system:
 2. **Fetches live odds** from The Odds API for current week's player props
 3. **Generates predictions** for receiving yards, rushing yards, passing yards, and receptions
 4. **Identifies edges** where our predictions significantly differ from sportsbook lines
-5. **Tracks results** to measure model accuracy and betting ROI
+5. **Generates parlays** from uncorrelated high-EV edges
+6. **Tracks results** to measure model accuracy and betting ROI
+7. **Sends Discord alerts** for edges and parlays
 
 ## Supported Stat Types
 
@@ -117,6 +119,40 @@ python scripts/orchestrate.py health
 python scripts/orchestrate.py health --notify
 ```
 
+### Generate Parlays
+
+Build parlay combinations from your best edges:
+
+```bash
+# Generate parlays (2-5 legs)
+python scripts/orchestrate.py parlay
+
+# Send top parlays to Discord
+python scripts/orchestrate.py parlay --notify
+
+# Customize parlay generation
+python scripts/orchestrate.py parlay --max-legs 4 --min-parlay-ev 20 --notify
+```
+
+**Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--top N` | 5 | Number of parlays to show per leg count |
+| `--max-legs N` | 5 | Maximum legs per parlay (2-5) |
+| `--min-prob` | 0.55 | Minimum probability per leg |
+| `--min-leg-ev` | 5.0 | Minimum EV% per individual leg |
+| `--min-parlay-ev` | 15.0 | Minimum combined EV% for parlay |
+| `--max-candidates` | 30 | Max legs to consider (limits combinatorics) |
+| `--notify` | false | Send top parlays to Discord |
+| `--save` | false | Store parlays in database |
+
+The parlay generator:
+- Filters to high-probability, high-EV legs only
+- Excludes correlated legs (same player, same-game passing stats)
+- Calculates combined odds and joint probability
+- Ranks by expected value
+
 ## Model Training
 
 Models are trained on historical data using only features available before each game:
@@ -193,8 +229,9 @@ python scripts/orchestrate.py health
 
 - Models perform best for high-volume players with consistent roles
 - Predictions don't account for injuries announced after data collection
-- Weather and game script adjustments are not yet implemented
+- Game script adjustments are not modeled
 - Backups and low-snap players have higher prediction variance
+- Weather data is fetched from Weather.gov (US stadiums only)
 
 ## License
 

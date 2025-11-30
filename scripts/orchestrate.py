@@ -328,6 +328,65 @@ def cmd_health(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     return 0 if report.status.value == "healthy" else 1
 
 
+def cmd_parlay(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
+    """Generate parlay recommendations."""
+    from src.sports_betting.analysis.parlay_generator import ParlayGenerator
+    from src.sports_betting.analysis.edge_calculator import EdgeCalculator
+
+    status = orchestrator.get_status()
+    season = args.season or status['season']
+    week = args.week or status['week']
+
+    print()
+    print("=" * 60)
+    print(f"PARLAY GENERATOR - {season} Week {week}")
+    print("=" * 60)
+    print()
+
+    # Get edges
+    print("Fetching edges...")
+    calculator = EdgeCalculator()
+    edges = calculator.find_edges_for_week(week=week, season=season, min_edge=0.03)
+
+    if not edges:
+        print("No edges found. Run 'orchestrate.py pre-game' first.")
+        return 1
+
+    print(f"Found {len(edges)} edges")
+    print()
+
+    # Generate parlays
+    generator = ParlayGenerator(
+        min_leg_probability=args.min_prob,
+        min_leg_ev=args.min_leg_ev / 100,  # Convert from percentage
+        min_parlay_ev=args.min_parlay_ev / 100,
+        max_legs=args.max_legs,
+        max_candidates=args.max_candidates,
+    )
+
+    parlays_by_size = generator.generate_all_parlays(edges, max_per_size=args.top)
+
+    # Print report
+    report = generator.format_parlay_report(parlays_by_size)
+    print(report)
+
+    # Store in database if requested
+    if args.save:
+        all_parlays = []
+        for parlays in parlays_by_size.values():
+            all_parlays.extend(parlays)
+        stored = generator.store_parlays(all_parlays)
+        print(f"Stored {stored} parlays in database")
+
+    # Send Discord notifications if requested
+    if args.notify:
+        print("Sending parlay notifications to Discord...")
+        sent = generator.send_discord_notifications(parlays_by_size, max_per_size=2)
+        print(f"Sent {sent} parlay notifications")
+
+    return 0
+
+
 def cmd_stage(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     """Run a single stage."""
     stage_name = args.stage_name
@@ -521,6 +580,55 @@ Examples:
         help="Fetch live weather from Weather.gov for all outdoor games",
     )
 
+    # Parlay command
+    parlay = subparsers.add_parser("parlay", help="Generate parlay recommendations")
+    parlay.add_argument(
+        "--top",
+        type=int,
+        default=5,
+        help="Number of parlays per size to show (default: 5)",
+    )
+    parlay.add_argument(
+        "--min-prob",
+        type=float,
+        default=0.55,
+        help="Minimum probability per leg (default: 0.55)",
+    )
+    parlay.add_argument(
+        "--min-leg-ev",
+        type=float,
+        default=5.0,
+        help="Minimum EV%% per leg (default: 5)",
+    )
+    parlay.add_argument(
+        "--min-parlay-ev",
+        type=float,
+        default=15.0,
+        help="Minimum combined EV%% for parlay (default: 15)",
+    )
+    parlay.add_argument(
+        "--save",
+        action="store_true",
+        help="Save parlays to database",
+    )
+    parlay.add_argument(
+        "--notify",
+        action="store_true",
+        help="Send top parlays to Discord",
+    )
+    parlay.add_argument(
+        "--max-legs",
+        type=int,
+        default=5,
+        help="Maximum legs per parlay (default: 5, max: 20). Uses greedy search for 5+ legs.",
+    )
+    parlay.add_argument(
+        "--max-candidates",
+        type=int,
+        default=30,
+        help="Maximum candidate legs to consider (default: 30, max: 50)",
+    )
+
     args = parser.parse_args()
 
     # Create orchestrator
@@ -543,6 +651,8 @@ Examples:
         return cmd_weather(orchestrator, args)
     elif args.command == "notify":
         return cmd_notify(orchestrator, args)
+    elif args.command == "parlay":
+        return cmd_parlay(orchestrator, args)
     else:
         parser.print_help()
         return 1

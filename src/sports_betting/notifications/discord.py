@@ -554,3 +554,64 @@ def send_health_alert(
         True if sent successfully
     """
     return _get_notifier().send_health_alert(status, issues, healthy_checks)
+
+
+def send_parlay_notification(parlay: Any) -> bool:
+    """Send a parlay notification to Discord.
+
+    Args:
+        parlay: ParlayCombo object from parlay_generator
+
+    Returns:
+        True if sent successfully
+    """
+    notifier = _get_notifier()
+    if not notifier.enabled:
+        return False
+
+    # Determine color based on EV
+    ev_pct = parlay.expected_value * 100
+    if ev_pct >= 50:
+        color = notifier.COLOR_SUCCESS  # High EV = green
+    elif ev_pct >= 25:
+        color = notifier.COLOR_EDGE  # Medium EV = purple
+    else:
+        color = notifier.COLOR_INFO  # Lower EV = blue
+
+    # Build title
+    title = f"🎰 {parlay.leg_count}-Leg Parlay"
+
+    # Build description with all legs
+    legs_description = []
+    for leg in parlay.legs:
+        direction_emoji = "📈" if leg.side == "over" else "📉"
+        market_short = leg.market.replace("player_", "").replace("_yds", "").replace("_", " ").title()
+        legs_description.append(
+            f"{direction_emoji} **{leg.player}** {leg.side.upper()} {leg.line} {market_short}\n"
+            f"   └ {leg.game} | Leg EV: {leg.ev_pct:+.1f}%"
+        )
+
+    description = "\n\n".join(legs_description)
+
+    # Format odds display
+    if parlay.implied_odds > 0:
+        odds_str = f"+{parlay.implied_odds}"
+    else:
+        odds_str = str(parlay.implied_odds)
+
+    fields = [
+        {"name": "Combined Odds", "value": odds_str, "inline": True},
+        {"name": "Joint Probability", "value": f"{parlay.joint_probability:.1%}", "inline": True},
+        {"name": "Expected Value", "value": f"+{ev_pct:.1f}%", "inline": True},
+        {"name": "Type", "value": parlay.parlay_type.replace("_", " ").title(), "inline": True},
+    ]
+
+    footer = f"NFL Parlay Bot | {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+
+    return notifier.send_embed(
+        title=title,
+        description=description,
+        color=color,
+        fields=fields,
+        footer=footer,
+    )

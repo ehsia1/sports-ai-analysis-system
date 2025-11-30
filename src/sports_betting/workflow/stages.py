@@ -559,6 +559,19 @@ class EdgeCalculationStage(WorkflowStage):
         self.logger.info(f"Calculating edges for {season} Week {week}")
 
         try:
+            # Fetch fresh weather for all outdoor games
+            from ..data.weather import get_weather_service
+            weather_service = get_weather_service()
+            weather_results = {}
+            outdoor_count = 0
+            try:
+                self.logger.info("Fetching live weather for outdoor games...")
+                weather_results = weather_service.fetch_all_outdoor_games(season, week)
+                outdoor_count = sum(1 for w in weather_results.values() if not w.is_dome)
+                self.logger.info(f"Updated weather for {outdoor_count} outdoor games")
+            except Exception as weather_error:
+                self.logger.warning(f"Weather fetch failed (using cached): {weather_error}")
+
             from ..analysis.edge_calculator import EdgeCalculator
 
             calculator = EdgeCalculator()
@@ -594,6 +607,9 @@ class EdgeCalculationStage(WorkflowStage):
                     edges[:notify_top_n], calculator
                 )
 
+            # Count bad weather games
+            bad_weather_games = [k for k, w in weather_results.items() if w.is_bad_weather]
+
             return self._create_result(
                 status=StageStatus.SUCCESS,
                 message=f"Found {len(edges)} edges with >{min_edge*100:.1f}% edge",
@@ -603,6 +619,8 @@ class EdgeCalculationStage(WorkflowStage):
                     "report": report,
                     "min_edge_pct": min_edge * 100,
                     "notifications_sent": notifications_sent,
+                    "weather_updated": outdoor_count,
+                    "bad_weather_games": bad_weather_games,
                 },
                 started_at=started_at,
                 ended_at=datetime.now(),
@@ -628,6 +646,7 @@ class EdgeCalculationStage(WorkflowStage):
         Returns:
             Number of notifications sent
         """
+        import time
         from ..notifications.discord import send_edge_alert, DiscordNotifier
 
         notifier = DiscordNotifier()
@@ -636,7 +655,7 @@ class EdgeCalculationStage(WorkflowStage):
             return 0
 
         sent_count = 0
-        for edge in edges:
+        for i, edge in enumerate(edges):
             try:
                 # Extract common edge data
                 player = edge.get("player", "Unknown")
@@ -686,6 +705,9 @@ class EdgeCalculationStage(WorkflowStage):
                 if success:
                     sent_count += 1
                     self.logger.debug(f"Sent Discord alert for {player}")
+                    # Rate limit: wait 1.5s between messages to avoid Discord throttling
+                    if i < len(edges) - 1:
+                        time.sleep(1.5)
 
             except Exception as e:
                 self.logger.warning(f"Failed to send Discord alert for {edge.get('player', 'Unknown')}: {e}")

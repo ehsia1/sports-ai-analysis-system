@@ -97,9 +97,9 @@ class EdgeCalculator:
         detailed_lines.append(f"{conf_emoji} Model confidence: {confidence:.0%}")
 
         # Weather impact
-        if weather_warning:
+        if weather_warning and "nan" not in str(weather_warning).lower():
             detailed_lines.append(f"🌨️ Weather: {weather_warning} (confidence adjusted)")
-        elif weather and weather != "Dome":
+        elif weather and weather != "Dome" and "nan" not in str(weather).lower() and weather != "Outdoor":
             detailed_lines.append(f"🌤️ Weather: {weather}")
 
         # Position context

@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 import json
 import logging
+import math
 import requests
 
 import nfl_data_py as nfl
@@ -198,6 +199,15 @@ class GameWeather:
 
         return impact
 
+    def _is_valid_number(self, val) -> bool:
+        """Check if value is a valid number (not None or NaN)."""
+        if val is None:
+            return False
+        try:
+            return not math.isnan(val)
+        except (TypeError, ValueError):
+            return False
+
     @property
     def summary(self) -> str:
         """Human-readable weather summary."""
@@ -207,9 +217,9 @@ class GameWeather:
         parts = []
         if self.conditions:
             parts.append(self.conditions.title())
-        if self.temp_f is not None:
+        if self._is_valid_number(self.temp_f):
             parts.append(f"{self.temp_f:.0f}°F")
-        if self.wind_mph is not None:
+        if self._is_valid_number(self.wind_mph):
             parts.append(f"{self.wind_mph:.0f}mph wind")
 
         return ", ".join(parts) if parts else "Outdoor"
@@ -336,8 +346,8 @@ class WeatherService:
                 weather = self.fetch_live_weather(home_team, away_team)
                 if weather:
                     results[key] = weather
-                    # Cache it as an override
-                    if weather.conditions and weather.conditions != "clear":
+                    # Cache all outdoor weather (not just bad weather)
+                    if not weather.is_dome:
                         self._manual_weather[key] = weather
 
             # Save any new weather data

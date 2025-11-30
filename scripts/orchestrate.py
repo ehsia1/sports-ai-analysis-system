@@ -139,6 +139,23 @@ def cmd_full(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     return 0 if result.success else 1
 
 
+def cmd_health(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
+    """Run health checks."""
+    from src.sports_betting.monitoring import run_health_check
+
+    print()
+    print("=" * 50)
+    print("SYSTEM HEALTH CHECK")
+    print("=" * 50)
+    print()
+
+    report = run_health_check(notify=args.notify)
+    print(report.summary())
+    print()
+
+    return 0 if report.status.value == "healthy" else 1
+
+
 def cmd_stage(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     """Run a single stage."""
     stage_name = args.stage_name
@@ -227,6 +244,14 @@ Examples:
         help="Force fetch even if cached",
     )
 
+    # Health check
+    health = subparsers.add_parser("health", help="Run system health checks")
+    health.add_argument(
+        "--notify",
+        action="store_true",
+        help="Send Discord notification if unhealthy",
+    )
+
     # Stage command
     stage = subparsers.add_parser("stage", help="Run a single stage")
     stage.add_argument(
@@ -254,6 +279,8 @@ Examples:
         return cmd_post_game(orchestrator, args)
     elif args.command == "full":
         return cmd_full(orchestrator, args)
+    elif args.command == "health":
+        return cmd_health(orchestrator, args)
     elif args.command == "stage":
         return cmd_stage(orchestrator, args)
     else:

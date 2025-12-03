@@ -299,6 +299,27 @@ class PaperTrader:
 class BetEvaluator:
     """Evaluate paper trade outcomes after games complete."""
 
+    # Map our market names to nfl_data_py column names
+    MARKET_TO_COLUMN = {
+        'player_reception_yds': 'receiving_yards',
+        'player_receiving_yds': 'receiving_yards',
+        'player_rush_yds': 'rushing_yards',
+        'player_rushing_yds': 'rushing_yards',
+        'player_pass_yds': 'passing_yards',
+        'player_passing_yds': 'passing_yards',
+        'player_receptions': 'receptions',
+        'player_pass_tds': 'passing_tds',
+        'player_rush_tds': 'rushing_tds',
+        'player_receiving_tds': 'receiving_tds',
+        'player_pass_attempts': 'attempts',
+        'player_pass_completions': 'completions',
+        'player_rush_attempts': 'carries',
+        'player_targets': 'targets',
+    }
+
+    def __init__(self):
+        self._weekly_stats_cache = {}  # Cache: (season, week) -> DataFrame
+
     def evaluate_trade(self, trade: PaperTrade, actual_result: float) -> Dict:
         """
         Evaluate a paper trade based on actual result.
@@ -310,8 +331,9 @@ class BetEvaluator:
         Returns:
             Dict with evaluation results
         """
-        # Determine if bet won
-        if trade.bet_side == 'over':
+        # Determine if bet won (case-insensitive comparison)
+        bet_side = trade.bet_side.lower()
+        if bet_side == 'over':
             won = actual_result > trade.line
         else:  # under
             won = actual_result < trade.line
@@ -371,11 +393,238 @@ class BetEvaluator:
         return evaluated
 
     def _get_actual_result(self, trade: PaperTrade) -> Optional[float]:
-        """Get actual stat result for a player in a game."""
-        # This would query from PlayerFeature or weekly stats
-        # Placeholder - would need to implement
-        # For now, return None (manual entry required)
+        """
+        Get actual stat result for a player in a game.
+
+        Fetches weekly stats from nfl_data_py and matches by player name.
+
+        Args:
+            trade: PaperTrade with player, game, and market info
+
+        Returns:
+            Actual stat value or None if not available
+        """
+        try:
+            # Get season and week from the game
+            game = trade.game
+            season = game.season
+            week = game.week
+            player = trade.player
+
+            # Get the column name for this market
+            column = self.MARKET_TO_COLUMN.get(trade.market)
+            if not column:
+                logger.warning(f"Unknown market type: {trade.market}")
+                return None
+
+            # Fetch weekly stats (cached)
+            weekly_df = self._get_weekly_stats(season, week)
+            if weekly_df is None or weekly_df.empty:
+                return None
+
+            # Try to find player by name
+            # nfl_data_py uses formats like "J.Chase", "C.Lamb", etc.
+            player_name = player.name
+
+            # Try exact match first
+            player_row = weekly_df[weekly_df['player_display_name'] == player_name]
+
+            # If no exact match, try partial match
+            if player_row.empty:
+                # Try matching on last name
+                last_name = player_name.split()[-1] if ' ' in player_name else player_name
+                player_row = weekly_df[
+                    weekly_df['player_display_name'].str.contains(last_name, case=False, na=False)
+                ]
+
+                # If multiple matches, try to narrow by team
+                if len(player_row) > 1 and player.team:
+                    team_abbr = player.team.abbreviation
+                    player_row = player_row[player_row['recent_team'] == team_abbr]
+
+            if player_row.empty:
+                # Player not found in stats - check if their team's game completed
+                # ESPN/nflverse don't list players with 0 in receiving/rushing stats
+                # If the game is completed and the player's team played, assume 0
+                if game.is_completed and player.team:
+                    team_abbr = player.team.abbreviation
+                    # Check if any player from this team appears in the data
+                    team_players = weekly_df[weekly_df['recent_team'] == team_abbr]
+                    if not team_players.empty:
+                        logger.info(f"Player {player_name} not in stats but team {team_abbr} played - recording 0")
+                        return 0.0
+
+                logger.debug(f"Player not found in weekly stats: {player_name}")
+                return None
+
+            # Get the stat value
+            if len(player_row) > 1:
+                # Multiple matches - take first (usually correct)
+                logger.warning(f"Multiple matches for {player_name}, using first")
+
+            stat_value = player_row.iloc[0].get(column)
+
+            if stat_value is None or (isinstance(stat_value, float) and np.isnan(stat_value)):
+                return 0.0  # Player played but had 0 in this stat
+
+            return float(stat_value)
+
+        except Exception as e:
+            logger.error(f"Error getting actual result for {trade.player.name}: {e}")
+            return None
+
+    def _get_weekly_stats(self, season: int, week: int) -> Optional['pd.DataFrame']:
+        """
+        Get weekly stats with fallback: nflverse -> ESPN.
+
+        Args:
+            season: NFL season year
+            week: Week number
+
+        Returns:
+            DataFrame with weekly stats or None if unavailable
+        """
+        import pandas as pd
+
+        cache_key = (season, week)
+        if cache_key in self._weekly_stats_cache:
+            return self._weekly_stats_cache[cache_key]
+
+        # Try nflverse first
+        week_df = self._fetch_nflverse_stats(season, week)
+
+        # Fall back to ESPN if nflverse doesn't have the data
+        if week_df is None or week_df.empty:
+            logger.info(f"Trying ESPN API for {season} week {week}")
+            week_df = self._fetch_espn_stats(season, week)
+
+        # Cache the result
+        self._weekly_stats_cache[cache_key] = week_df
+        return week_df
+
+    def _fetch_nflverse_stats(self, season: int, week: int) -> Optional['pd.DataFrame']:
+        """Fetch stats from nflverse/nfl_data_py."""
+        try:
+            import nfl_data_py as nfl
+
+            logger.info(f"Fetching nflverse stats for {season} week {week}")
+            weekly_df = nfl.import_weekly_data(years=[season])
+            week_df = weekly_df[weekly_df['week'] == week].copy()
+
+            if not week_df.empty:
+                return week_df
+
+        except Exception as e:
+            logger.debug(f"nflverse {season} not available: {e}")
+
         return None
+
+    def _fetch_espn_stats(self, season: int, week: int) -> Optional['pd.DataFrame']:
+        """Fetch stats from ESPN API."""
+        import requests
+        import pandas as pd
+
+        try:
+            # Get all games for this week
+            scoreboard_url = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard'
+            params = {'week': week, 'seasontype': 2, 'dates': season}
+
+            resp = requests.get(scoreboard_url, params=params, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+
+            events = data.get('events', [])
+            if not events:
+                logger.warning(f"No ESPN events found for {season} week {week}")
+                return None
+
+            # Collect player stats from all games
+            all_players = []
+
+            for event in events:
+                game_id = event['id']
+                game_status = event.get('status', {}).get('type', {}).get('name', '')
+
+                # Skip games that haven't completed
+                if game_status != 'STATUS_FINAL':
+                    continue
+
+                # Get box score
+                summary_url = f'https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event={game_id}'
+                box_resp = requests.get(summary_url, timeout=10)
+                box_resp.raise_for_status()
+                box_data = box_resp.json()
+
+                boxscore = box_data.get('boxscore', {})
+                teams_stats = boxscore.get('players', [])
+
+                for team_data in teams_stats:
+                    team_abbr = team_data.get('team', {}).get('abbreviation', '')
+
+                    for stat_group in team_data.get('statistics', []):
+                        stat_name = stat_group.get('name', '')
+
+                        for athlete in stat_group.get('athletes', []):
+                            player_info = athlete.get('athlete', {})
+                            player_name = player_info.get('displayName', '')
+                            stats = athlete.get('stats', [])
+
+                            player_record = {
+                                'player_display_name': player_name,
+                                'recent_team': team_abbr,
+                                'week': week,
+                            }
+
+                            # Parse stats based on category
+                            # ESPN stat order varies by category
+                            if stat_name == 'receiving' and len(stats) >= 2:
+                                # REC, YDS, AVG, TD, LONG, TGTS
+                                player_record['receptions'] = self._parse_stat(stats[0])
+                                player_record['receiving_yards'] = self._parse_stat(stats[1])
+                                if len(stats) >= 4:
+                                    player_record['receiving_tds'] = self._parse_stat(stats[3])
+                                if len(stats) >= 6:
+                                    player_record['targets'] = self._parse_stat(stats[5])
+
+                            elif stat_name == 'rushing' and len(stats) >= 2:
+                                # CAR, YDS, AVG, TD, LONG
+                                player_record['carries'] = self._parse_stat(stats[0])
+                                player_record['rushing_yards'] = self._parse_stat(stats[1])
+                                if len(stats) >= 4:
+                                    player_record['rushing_tds'] = self._parse_stat(stats[3])
+
+                            elif stat_name == 'passing' and len(stats) >= 4:
+                                # C/ATT, YDS, AVG, TD, INT, QBR
+                                c_att = stats[0].split('/') if '/' in str(stats[0]) else ['0', '0']
+                                player_record['completions'] = self._parse_stat(c_att[0])
+                                player_record['attempts'] = self._parse_stat(c_att[1]) if len(c_att) > 1 else 0
+                                player_record['passing_yards'] = self._parse_stat(stats[1])
+                                player_record['passing_tds'] = self._parse_stat(stats[3])
+
+                            # Only add if we got meaningful stats
+                            if any(k in player_record for k in ['receiving_yards', 'rushing_yards', 'passing_yards']):
+                                all_players.append(player_record)
+
+            if all_players:
+                df = pd.DataFrame(all_players)
+                logger.info(f"ESPN: Retrieved {len(df)} player stats for week {week}")
+                return df
+
+            logger.warning(f"No completed games found in ESPN for {season} week {week}")
+            return None
+
+        except Exception as e:
+            logger.warning(f"ESPN API error for {season} week {week}: {e}")
+            return None
+
+    def _parse_stat(self, value) -> float:
+        """Parse a stat value to float, handling '--' and other edge cases."""
+        if value is None or value == '--' or value == '':
+            return 0.0
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
 
 
 class ROICalculator:

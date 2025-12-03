@@ -122,7 +122,127 @@ def cmd_post_game(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     print(result.summary())
     print()
 
+    # Show pending trades that couldn't be scored
+    if args.show_pending:
+        from src.sports_betting.database import get_session
+        from src.sports_betting.database.models import PaperTrade, Game, Player
+
+        status = orchestrator.get_status()
+        season = args.season or status['season']
+        week = args.week or status['week']
+
+        with get_session() as session:
+            pending = (
+                session.query(PaperTrade)
+                .join(Game)
+                .join(Player, PaperTrade.player_id == Player.id)
+                .filter(
+                    Game.season == season,
+                    Game.week == week,
+                    PaperTrade.won.is_(None)
+                )
+                .all()
+            )
+
+            if pending:
+                print()
+                print(f"PENDING TRADES ({len(pending)}):")
+                print("-" * 60)
+                print("These trades could not be auto-scored (stats not available yet)")
+                print()
+                for t in pending:
+                    print(f"  ID {t.id}: {t.player.name} - {t.bet_side.upper()} {t.line} ({t.market})")
+                print()
+                print("To manually score, use: orchestrate.py results --score <id> <actual_value>")
+            else:
+                print("All trades have been scored!")
+
     return 0 if result.success else 1
+
+
+def cmd_results(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
+    """View and manage paper trade results."""
+    from src.sports_betting.database import get_session
+    from src.sports_betting.database.models import PaperTrade, Game, Player
+    from src.sports_betting.tracking.paper_trader import BetEvaluator
+
+    status = orchestrator.get_status()
+    season = args.season or status['season']
+    week = args.week or status['week']
+
+    # Manual scoring mode
+    if args.score:
+        trade_id, actual_value = args.score
+        actual_value = float(actual_value)
+
+        with get_session() as session:
+            trade = session.get(PaperTrade, int(trade_id))
+            if not trade:
+                print(f"Error: Trade ID {trade_id} not found")
+                return 1
+
+            evaluator = BetEvaluator()
+            result = evaluator.evaluate_trade(trade, actual_value)
+
+            trade.actual_result = result['actual_result']
+            trade.won = result['won']
+            trade.profit_loss = result['profit_loss']
+            trade.evaluated_at = __import__('datetime').datetime.now()
+
+            session.commit()
+
+            outcome = "WON" if result['won'] else "LOST"
+            print(f"✓ Scored trade {trade_id}: {outcome} (P&L: ${result['profit_loss']:+.2f})")
+
+        return 0
+
+    # List results
+    print()
+    print("=" * 60)
+    print(f"PAPER TRADE RESULTS - {season} Week {week}")
+    print("=" * 60)
+    print()
+
+    with get_session() as session:
+        trades = (
+            session.query(PaperTrade)
+            .join(Game)
+            .join(Player, PaperTrade.player_id == Player.id)
+            .filter(Game.season == season, Game.week == week)
+            .order_by(PaperTrade.won.desc(), PaperTrade.profit_loss.desc())
+            .all()
+        )
+
+        if not trades:
+            print("No paper trades found for this week.")
+            return 0
+
+        wins = sum(1 for t in trades if t.won is True)
+        losses = sum(1 for t in trades if t.won is False)
+        pending = sum(1 for t in trades if t.won is None)
+        total_pnl = sum(t.profit_loss or 0 for t in trades)
+
+        print(f"Record: {wins}-{losses} ({pending} pending)")
+        print(f"Total P&L: ${total_pnl:+.2f}")
+        print()
+
+        # Group by result
+        if args.verbose:
+            for status_name, filter_fn in [("WINS", lambda t: t.won is True),
+                                           ("LOSSES", lambda t: t.won is False),
+                                           ("PENDING", lambda t: t.won is None)]:
+                group = [t for t in trades if filter_fn(t)]
+                if group:
+                    print(f"{status_name}:")
+                    for t in group:
+                        actual = f"Actual: {t.actual_result:.1f}" if t.actual_result is not None else "Actual: ?"
+                        pnl = f"${t.profit_loss:+.2f}" if t.profit_loss is not None else ""
+                        print(f"  [{t.id}] {t.player.name}: {t.bet_side.upper()} {t.line} ({actual}) {pnl}")
+                    print()
+        else:
+            print("Use --verbose for detailed breakdown, or --score <id> <value> to manually score")
+
+    return 0
 
 
 def cmd_full(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
@@ -495,7 +615,26 @@ Examples:
     )
 
     # Post-game workflow
-    subparsers.add_parser("post-game", help="Run post-game workflow")
+    post_game = subparsers.add_parser("post-game", help="Run post-game workflow")
+    post_game.add_argument(
+        "--show-pending",
+        action="store_true",
+        help="Show trades that couldn't be auto-scored",
+    )
+
+    # Results command
+    results = subparsers.add_parser("results", help="View and manage paper trade results")
+    results.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed breakdown of all trades",
+    )
+    results.add_argument(
+        "--score",
+        nargs=2,
+        metavar=("ID", "VALUE"),
+        help="Manually score a trade: --score <trade_id> <actual_value>",
+    )
 
     # Full workflow
     full = subparsers.add_parser("full", help="Run full workflow")
@@ -653,6 +792,8 @@ Examples:
         return cmd_notify(orchestrator, args)
     elif args.command == "parlay":
         return cmd_parlay(orchestrator, args)
+    elif args.command == "results":
+        return cmd_results(orchestrator, args)
     else:
         parser.print_help()
         return 1

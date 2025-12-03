@@ -106,8 +106,8 @@ class Orchestrator:
     # Define workflow stage sequences
     WORKFLOWS = {
         WorkflowType.PRE_GAME: ["collect_odds", "generate_predictions", "calculate_edges"],
-        WorkflowType.POST_GAME: ["score_results"],
-        WorkflowType.FULL: ["collect_odds", "generate_predictions", "calculate_edges", "score_results"],
+        WorkflowType.POST_GAME: ["refresh_schedule", "score_results"],
+        WorkflowType.FULL: ["collect_odds", "generate_predictions", "calculate_edges", "refresh_schedule", "score_results"],
     }
 
     def __init__(self):

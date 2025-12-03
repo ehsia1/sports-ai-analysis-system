@@ -718,6 +718,69 @@ class EdgeCalculationStage(WorkflowStage):
         return sent_count
 
 
+class RefreshScheduleStage(WorkflowStage):
+    """Stage for refreshing game schedule data from nfl_data_py."""
+
+    name = "refresh_schedule"
+    description = "Refresh game schedule and completion status from NFL data"
+    required_phases = [GamePhase.POST_GAME, GamePhase.IN_PROGRESS]
+
+    def execute(self, season: int, week: int, **kwargs) -> StageResult:
+        """
+        Refresh schedule data to update game completion status and scores.
+
+        Args:
+            season: NFL season
+            week: Week number
+
+        Returns:
+            StageResult with refresh metrics
+        """
+        started_at = datetime.now()
+
+        self.logger.info(f"Refreshing schedule for {season} Week {week}")
+
+        try:
+            from ..data.collectors.nfl_data import NFLDataCollector
+
+            collector = NFLDataCollector()
+            # collect_schedule updates existing games with scores and is_completed
+            collector.collect_schedule([season])
+
+            # Check how many games are now completed
+            from ..database import get_session
+            from ..database.models import Game
+
+            with get_session() as session:
+                games = (
+                    session.query(Game)
+                    .filter(Game.season == season, Game.week == week)
+                    .all()
+                )
+                completed = sum(1 for g in games if g.is_completed)
+                total = len(games)
+
+            self.logger.info(f"Schedule refresh complete: {completed}/{total} games completed")
+
+            return self._create_result(
+                status=StageStatus.SUCCESS,
+                message=f"Refreshed schedule: {completed}/{total} games completed",
+                data={"completed_games": completed, "total_games": total},
+                started_at=started_at,
+                ended_at=datetime.now(),
+            )
+
+        except Exception as e:
+            self.logger.error(f"Schedule refresh failed: {e}")
+            return self._create_result(
+                status=StageStatus.FAILED,
+                message=f"Schedule refresh failed: {str(e)}",
+                error=e,
+                started_at=started_at,
+                ended_at=datetime.now(),
+            )
+
+
 class ResultsScoringStage(WorkflowStage):
     """Stage for scoring predictions against actual results."""
 
@@ -791,19 +854,33 @@ class ResultsScoringStage(WorkflowStage):
                 )
 
                 self.logger.info(
-                    f"Scoring {len(predictions)} predictions, {len(paper_trades)} paper trades"
+                    f"Found {len(predictions)} predictions, {len(paper_trades)} paper trades"
                 )
 
-            # For now, return basic status - full implementation would
-            # fetch actual stats from nfl-data-py and compare
+                # Count pending trades before evaluation
+                pending_count = sum(1 for t in paper_trades if t.won is None)
+
+            # Evaluate paper trades using BetEvaluator
+            evaluated_count = 0
+            if pending_count > 0:
+                try:
+                    from ..tracking.paper_trader import BetEvaluator
+
+                    evaluator = BetEvaluator()
+                    evaluated_count = evaluator.evaluate_all_pending()
+                    self.logger.info(f"Evaluated {evaluated_count} paper trades")
+                except Exception as e:
+                    self.logger.warning(f"Paper trade evaluation failed: {e}")
+
             return self._create_result(
                 status=StageStatus.SUCCESS,
-                message=f"Scored {completed}/{total} games",
+                message=f"Scored {completed}/{total} games, evaluated {evaluated_count} trades",
                 data={
                     "completed_games": completed,
                     "total_games": total,
                     "predictions_count": len(predictions),
                     "paper_trades_count": len(paper_trades),
+                    "trades_evaluated": evaluated_count,
                 },
                 started_at=started_at,
                 ended_at=datetime.now(),
@@ -825,6 +902,7 @@ STAGE_REGISTRY: Dict[str, type] = {
     "collect_odds": OddsCollectionStage,
     "generate_predictions": PredictionStage,
     "calculate_edges": EdgeCalculationStage,
+    "refresh_schedule": RefreshScheduleStage,
     "score_results": ResultsScoringStage,
 }
 

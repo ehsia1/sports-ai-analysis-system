@@ -262,7 +262,7 @@ class InjuryService:
                     games_missed=injury_report.games_missed
                 )
             else:
-                # No DB injury report - check ESPN cache
+                # No DB injury report - check ESPN cache (authoritative source)
                 espn_injury = self._espn_cache.get(player.name)
                 if espn_injury:
                     status = InjuryStatus(
@@ -273,8 +273,19 @@ class InjuryService:
                         practice_friday=None,
                         games_missed=0
                     )
+                elif self._espn_cache:
+                    # ESPN cache was populated but player not in it = healthy
+                    # ESPN removes players who are cleared to play
+                    status = InjuryStatus(
+                        player_id=player_id,
+                        player_name=player.name,
+                        status="Healthy",
+                        primary_injury=None,
+                        practice_friday=None,
+                        games_missed=0
+                    )
                 else:
-                    # No injury report - check player's current_status field
+                    # ESPN not fetched - fall back to player's current_status field
                     status = InjuryStatus(
                         player_id=player_id,
                         player_name=player.name,

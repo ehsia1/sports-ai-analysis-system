@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class ParlayLeg:
     """Single leg of a parlay."""
     player: str
+    team: str  # Team abbreviation (e.g., 'ATL', 'DET')
     game: str
     market: str
     side: str  # "over" or "under"
@@ -125,6 +126,7 @@ class ParlayGenerator:
 
             leg = ParlayLeg(
                 player=edge.get("player", "Unknown"),
+                team=edge.get("team", ""),
                 game=edge.get("game", ""),
                 market=edge.get("market", ""),
                 side=side,
@@ -158,21 +160,28 @@ class ParlayGenerator:
         return limited_legs
 
     def are_correlated(self, leg1: ParlayLeg, leg2: ParlayLeg) -> bool:
-        """Check if two legs are correlated (should not be combined)."""
-        # Same player - always correlated
-        if leg1.player == leg2.player:
+        """
+        Check if two legs are correlated (should not be combined).
+
+        Same-Game Parlays (SGPs) are valid betting products offered by sportsbooks.
+        We only block truly problematic combinations:
+        - Same player, same market, opposite sides (e.g., OVER and UNDER on same line)
+
+        Allowed combinations:
+        - Same player, different markets (e.g., mobile QB pass yards + rush yards)
+        - Same team, same game (SGP) - e.g., ATL QB + ATL RB
+        - Different teams, same game (SGP) - e.g., DET QB + DAL RB
+        - Cross-game (standard parlay)
+        """
+        # Same player, same market = correlated (can't bet both sides)
+        if leg1.player == leg2.player and leg1.market == leg2.market:
             return True
 
-        # Same game passing stats are somewhat correlated
-        # (if QB throws more, WRs catch more)
-        if leg1.game == leg2.game:
-            passing_markets = {"player_pass_yds", "player_reception_yds", "player_receptions"}
-            if leg1.market in passing_markets and leg2.market in passing_markets:
-                # Allow combining if opposite directions (one over, one under)
-                if leg1.side != leg2.side:
-                    return False
-                return True
-
+        # Everything else is allowed:
+        # - Same player, different markets (mobile QB pass + rush, RB rush + receptions)
+        # - Same game, same team (SGP)
+        # - Same game, different teams (SGP)
+        # - Cross-game (standard parlay)
         return False
 
     def calculate_parlay_odds(self, legs: List[ParlayLeg]) -> Tuple[float, int, int]:

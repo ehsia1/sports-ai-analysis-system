@@ -443,6 +443,7 @@ class EdgeCalculator:
                             'game': f"{game.away_team.abbreviation} @ {game.home_team.abbreviation}",
                             'game_date': game.game_date,
                             'player': player.name,
+                            'team': player.team.abbreviation if player.team else None,
                             'position': player.position,
                             'market': prop.market,
                             'weather': weather.summary if weather else None,

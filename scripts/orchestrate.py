@@ -89,6 +89,7 @@ def cmd_pre_game(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     print(result.summary())
     print()
 
+    edges = None
     # Print edge report if available
     for stage_result in result.stage_results:
         if stage_result.stage_name == "calculate_edges" and "edges" in stage_result.data:
@@ -102,6 +103,52 @@ def cmd_pre_game(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
                 from src.sports_betting.analysis.edge_calculator import EdgeCalculator
                 calculator = EdgeCalculator()
                 print(calculator.format_edge_report(edges, top_n=args.top))
+
+    # Generate 8-12 leg parlays automatically
+    if edges and not args.no_parlay:
+        print()
+        print("=" * 60)
+        print("LARGE PARLAYS (8-12 LEGS)")
+        print("=" * 60)
+        print()
+
+        from src.sports_betting.analysis.parlay_generator import ParlayGenerator
+
+        generator = ParlayGenerator(
+            min_leg_probability=0.55,
+            min_leg_ev=0.05,  # 5% min EV per leg
+            min_parlay_ev=0.20,  # 20% min combined EV
+            max_legs=12,
+            max_candidates=40,
+        )
+
+        # Generate parlays of sizes 8-12
+        all_parlays = generator.generate_all_parlays(edges, max_per_size=3)
+
+        # Filter to only 8-12 leg parlays
+        large_parlays = {k: v for k, v in all_parlays.items() if k >= 8}
+
+        if large_parlays:
+            report = generator.format_parlay_report(large_parlays)
+            print(report)
+
+            # Send Discord notification for the best large parlay
+            if not getattr(args, "no_notify", False):
+                best_size = max(large_parlays.keys())
+                if best_size >= 8 and large_parlays[best_size]:
+                    print()
+                    print("Sending large parlay to Discord...")
+                    sent = generator.send_discord_notifications(
+                        {best_size: large_parlays[best_size][:1]},  # Just the best one
+                        max_per_size=1
+                    )
+                    if sent:
+                        print(f"✓ Sent {best_size}-leg parlay notification")
+        else:
+            print("No 8-12 leg parlays meeting criteria found.")
+            print()
+            print("This is normal - large parlays require many uncorrelated +EV edges.")
+            print("For smaller parlays, run: orchestrate.py parlay --max-legs 5")
 
     return 0 if result.success else 1
 
@@ -612,6 +659,11 @@ Examples:
         "--no-notify",
         action="store_true",
         help="Skip Discord notifications",
+    )
+    pre_game.add_argument(
+        "--no-parlay",
+        action="store_true",
+        help="Skip automatic 8-12 leg parlay generation",
     )
 
     # Post-game workflow

@@ -15,6 +15,15 @@ logger = logging.getLogger(__name__)
 class EdgeCalculator:
     """Calculate and identify betting edges."""
 
+    # Minimum line thresholds by market to filter out low-volume players
+    # Week 13 showed betting on players with very low lines (0.5, 1.5 yards) is risky
+    MIN_LINE_THRESHOLDS = {
+        'player_reception_yds': 15.0,  # Skip props below 15 receiving yards
+        'player_rush_yds': 10.0,       # Skip props below 10 rushing yards
+        'player_pass_yds': 150.0,      # Skip props below 150 passing yards
+        'player_receptions': 2.0,      # Skip props below 2 receptions
+    }
+
     def __init__(self):
         self.min_edge = 0.03  # Minimum 3% edge to consider
         self.min_confidence = 0.65  # Minimum model confidence
@@ -221,6 +230,64 @@ class EdgeCalculator:
             },
         }
 
+    # Player Tier System - affects confidence adjustments and bet filtering
+    # Tier 1 (Elite): Avoid UNDERs, high variance players
+    # Tier 2 (Starter): Normal treatment
+    # Tier 3 (Backup/Depth): Require higher edge to bet
+    PLAYER_TIERS = {
+        # Tier 1 - Elite (avoid UNDERs on receiving)
+        'elite_wr': {
+            "Ja'Marr Chase", "Ja'marr Chase", "CeeDee Lamb", "Justin Jefferson", "Tyreek Hill",
+            "A.J. Brown", "Amon-Ra St. Brown", "Davante Adams", "Stefon Diggs",
+            "DK Metcalf", "Chris Olave", "Garrett Wilson", "Nico Collins",
+            "Puka Nacua", "Mike Evans", "Deebo Samuel", "Jaylen Waddle",
+        },
+        'elite_rb': {
+            "Derrick Henry", "Saquon Barkley", "Breece Hall", "Bijan Robinson",
+            "Jonathan Taylor", "Josh Jacobs", "De'Von Achane", "Jahmyr Gibbs",
+            "Kyren Williams", "Joe Mixon", "Alvin Kamara", "James Cook",
+        },
+        'elite_te': {
+            "Travis Kelce", "George Kittle", "Mark Andrews", "Sam LaPorta",
+            "Trey McBride", "T.J. Hockenson", "David Njoku", "Dalton Kincaid",
+        },
+        'elite_qb': {
+            "Patrick Mahomes", "Josh Allen", "Lamar Jackson", "Jalen Hurts",
+            "Joe Burrow", "Dak Prescott", "Tua Tagovailoa", "C.J. Stroud",
+        },
+    }
+
+    # For backwards compatibility
+    ELITE_WRS = PLAYER_TIERS['elite_wr']
+
+    # Confidence adjustment by tier (lower = more conservative)
+    TIER_CONFIDENCE_MULTIPLIER = {
+        'elite': 0.95,    # Slightly reduce confidence for elite (high variance)
+        'starter': 1.0,   # Normal confidence
+        'backup': 0.85,   # Reduce confidence for backups (inconsistent usage)
+    }
+
+    def get_player_tier(self, player_name: str, position: str) -> str:
+        """
+        Determine a player's tier based on name and position.
+
+        Returns: 'elite', 'starter', or 'backup'
+        """
+        # Check if player is in any elite tier
+        position_to_tier_key = {
+            'WR': 'elite_wr',
+            'RB': 'elite_rb',
+            'TE': 'elite_te',
+            'QB': 'elite_qb',
+        }
+
+        tier_key = position_to_tier_key.get(position)
+        if tier_key and player_name in self.PLAYER_TIERS.get(tier_key, set()):
+            return 'elite'
+
+        # Default to starter (we don't have backup detection yet)
+        return 'starter'
+
     def find_edges_for_week(
         self,
         week: int,
@@ -239,6 +306,8 @@ class EdgeCalculator:
             self.min_edge = min_edge
 
         edges = []
+        # TODO: Week 14 - Track player bets to avoid duplicates (deduplication)
+        seen_player_bets = {}  # {(player_id, market, side): best_edge}
 
         # Get weather data for the week
         weather_service = get_weather_service()
@@ -266,6 +335,12 @@ class EdgeCalculator:
                 ).all()
 
                 for prop in props:
+                    # Skip props below minimum line threshold (low-volume players)
+                    min_line = self.MIN_LINE_THRESHOLDS.get(prop.market, 0)
+                    if prop.line < min_line:
+                        logger.debug(f"Skipping low-volume prop: {prop.market} line {prop.line} < {min_line}")
+                        continue
+
                     # Get model prediction - match by player and market (predictions may have different game_id)
                     prediction = session.query(Prediction).filter_by(
                         player_id=prop.player_id,
@@ -299,6 +374,15 @@ class EdgeCalculator:
 
                     if has_edge:
                         player = session.query(Player).get(prop.player_id)
+
+                        # Skip UNDER bets on elite WRs for receiving yards
+                        # Week 13 showed elite WRs (Chase, Lamb) crushed UNDER bets
+                        if (prop.market == 'player_reception_yds' and
+                            player.name in self.ELITE_WRS and
+                            edge_analysis['under']['should_bet'] and
+                            not edge_analysis['over']['should_bet']):
+                            logger.info(f"Skipping UNDER bet on elite WR: {player.name}")
+                            continue
 
                         # Determine which side has the edge
                         if edge_analysis['over']['should_bet']:
@@ -345,6 +429,34 @@ class EdgeCalculator:
             key=lambda x: max(abs(x['over']['ev']), abs(x['under']['ev'])),
             reverse=True
         )
+
+        # Deduplicate edges - keep only best line per player/market/side
+        # This prevents having 9 bets on same player at slightly different lines
+        original_count = len(edges)
+        deduplicated = {}
+        for edge in edges:
+            bet_side = 'over' if edge['over']['should_bet'] else 'under'
+            key = (edge['player'], edge['market'], bet_side)
+
+            if key not in deduplicated:
+                deduplicated[key] = edge
+            else:
+                # Keep the one with better EV
+                existing_ev = deduplicated[key][bet_side]['ev']
+                new_ev = edge[bet_side]['ev']
+                if new_ev > existing_ev:
+                    deduplicated[key] = edge
+
+        edges = list(deduplicated.values())
+
+        # Re-sort after deduplication
+        edges.sort(
+            key=lambda x: max(abs(x['over']['ev']), abs(x['under']['ev'])),
+            reverse=True
+        )
+
+        if original_count != len(edges):
+            logger.info(f"Deduplicated {original_count} edges to {len(edges)} unique player/market/side combinations")
 
         logger.info(f"Found {len(edges)} edges for week {week}")
 

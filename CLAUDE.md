@@ -1,5 +1,18 @@
 # NFL Sports Betting System - Claude Code Guide
 
+## Virtual Environment
+
+**IMPORTANT**: Always use the virtual environment for all Python commands.
+
+```bash
+# Activate venv before running any commands
+source venv/bin/activate
+
+# All python/pip commands should use venv
+python scripts/orchestrate.py status  # Not python3!
+pip install package_name              # Not pip3!
+```
+
 ## Project Overview
 
 ML-powered NFL player props prediction system that:
@@ -162,6 +175,13 @@ mcp__notion__notion-create-pages(
   - APScheduler for automation
   - EC2 deployment
   - CloudWatch logging
+
+### Week 14 Improvements (Completed)
+- [x] **Elite WR Filter**: Skip UNDER bets on elite WRs (Chase, Lamb, Jefferson, etc.) for receiving yards
+- [x] **Bet Deduplication**: Keep only best line per player/market/side (no more 9 bets on same player)
+- [x] **Volume Threshold**: Min line thresholds filter out low-volume players (15+ rec yds, 10+ rush yds, etc.)
+- [x] **Player Tier System**: Elite/Starter/Backup classification with confidence multipliers
+- [x] **Diversification**: Already supported - all markets (receiving, rushing, passing, receptions) working
 
 ### Future Ideas
 - More stat types (TDs, interceptions)

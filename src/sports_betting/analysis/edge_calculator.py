@@ -2,7 +2,7 @@
 
 import numpy as np
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 from ..database import get_session
@@ -322,8 +322,9 @@ class EdgeCalculator:
         weather_service = get_weather_service()
         week_weather = weather_service.get_weather_for_week(season, week)
 
-        # Get injury service
+        # Get injury service and pre-fetch ESPN data
         injury_service = get_injury_service()
+        injury_service.fetch_all_espn_injuries()  # Pre-populate cache
 
         with get_session() as session:
             # Get all games for this week
@@ -338,12 +339,13 @@ class EdgeCalculator:
                 game_key = f"{game.away_team.abbreviation}@{game.home_team.abbreviation}"
                 weather = week_weather.get(game_key)
 
-                # Get props for this game
+                # Get props for this game (include props from last 48 hours)
+                cutoff_time = datetime.now() - timedelta(hours=48)
                 props = session.query(Prop).filter_by(
                     game_id=game.id,
                     is_active=True
                 ).filter(
-                    Prop.timestamp >= datetime.now().replace(hour=0, minute=0, second=0)
+                    Prop.timestamp >= cutoff_time
                 ).all()
 
                 for prop in props:

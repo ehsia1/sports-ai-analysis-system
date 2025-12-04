@@ -25,6 +25,34 @@ class EdgeCalculator:
         'player_receptions': 2.0,      # Skip props below 2 receptions
     }
 
+    # ==========================================================================
+    # CONFIGURABLE BET FILTERS (Option A)
+    # Based on Week 13 analysis - these are static thresholds that filter out
+    # bet types with historically poor win rates.
+    #
+    # TODO: Convert to dynamic filters (Option B) - auto-adjust based on
+    # historical win rates per market/position/side combination. Track rolling
+    # performance and dynamically enable/disable filters when sample size
+    # reaches statistical significance (n>=30 bets per category).
+    # ==========================================================================
+    BET_FILTERS = {
+        # Skip reception lines > 70 yards (Week 13: 10% win rate, -$1,674)
+        # High lines typically on elite WRs who have high variance
+        'max_reception_line': 70.0,
+
+        # Skip TE OVER bets (Week 13: 33% win rate, -$398)
+        # TEs have inconsistent target share and red zone dependency
+        'skip_te_over': True,
+
+        # Additional elite WRs to add to UNDER filter (beyond base list)
+        # Week 13 showed Rashee Rice crushed UNDER bets
+        'additional_elite_wrs': {'Rashee Rice'},
+
+        # Future filters to consider based on more data:
+        # 'skip_under_all': False,  # Week 13: UNDER overall 21.7% win rate
+        # 'min_rb_over_edge': 0.05,  # RB OVER performed well (71.4%)
+    }
+
     def __init__(self):
         self.min_edge = 0.03  # Minimum 3% edge to consider
         self.min_confidence = 0.65  # Minimum model confidence
@@ -266,8 +294,11 @@ class EdgeCalculator:
         },
     }
 
-    # For backwards compatibility
-    ELITE_WRS = PLAYER_TIERS['elite_wr']
+    # For backwards compatibility - combine base elite WRs with additional from filters
+    @property
+    def ELITE_WRS(self):
+        """Get combined elite WRs (base list + additional from BET_FILTERS)."""
+        return self.PLAYER_TIERS['elite_wr'] | self.BET_FILTERS.get('additional_elite_wrs', set())
 
     # Confidence adjustment by tier (lower = more conservative)
     TIER_CONFIDENCE_MULTIPLIER = {
@@ -355,6 +386,14 @@ class EdgeCalculator:
                         logger.debug(f"Skipping low-volume prop: {prop.market} line {prop.line} < {min_line}")
                         continue
 
+                    # Skip reception lines above max threshold (high variance, poor win rate)
+                    max_rec_line = self.BET_FILTERS.get('max_reception_line')
+                    if (max_rec_line and
+                        prop.market == 'player_reception_yds' and
+                        prop.line > max_rec_line):
+                        logger.debug(f"Skipping high reception line: {prop.line} > {max_rec_line}")
+                        continue
+
                     # Get model prediction - match by player and market (predictions may have different game_id)
                     prediction = session.query(Prediction).filter_by(
                         player_id=prop.player_id,
@@ -411,6 +450,16 @@ class EdgeCalculator:
                             edge_analysis['under']['should_bet'] and
                             not edge_analysis['over']['should_bet']):
                             logger.info(f"Skipping UNDER bet on elite WR: {player.name}")
+                            continue
+
+                        # Skip TE OVER bets (inconsistent target share, red zone dependent)
+                        # Week 13: 33% win rate, -$398
+                        if (self.BET_FILTERS.get('skip_te_over') and
+                            player.position == 'TE' and
+                            prop.market in ('player_reception_yds', 'player_receptions') and
+                            edge_analysis['over']['should_bet'] and
+                            not edge_analysis['under']['should_bet']):
+                            logger.info(f"Skipping OVER bet on TE: {player.name}")
                             continue
 
                         # Determine which side has the edge

@@ -478,6 +478,40 @@ def cmd_weather(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_injuries(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
+    """Show and collect injury reports."""
+    from src.sports_betting.data.injuries import get_injury_service
+    from src.sports_betting.data.collectors.nfl_data import NFLDataCollector
+
+    status = orchestrator.get_status()
+    season = args.season or status['season']
+    week = args.week or status['week']
+
+    # Refresh injury data if requested
+    if args.refresh:
+        print()
+        print(f"Refreshing injury data for {season}...")
+        print()
+
+        collector = NFLDataCollector()
+        count = collector.collect_injury_reports([season])
+        print(f"✓ Collected {count} injury reports")
+        print()
+
+    # Show injury report
+    print()
+    print("=" * 60)
+    print(f"INJURY REPORT - {season} Week {week}")
+    print("=" * 60)
+
+    injury_service = get_injury_service()
+    report = injury_service.get_injured_players_summary(season, week)
+    print(report)
+    print()
+
+    return 0
+
+
 def cmd_health(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     """Run health checks."""
     from src.sports_betting.monitoring import run_health_check
@@ -771,6 +805,14 @@ Examples:
         help="Fetch live weather from Weather.gov for all outdoor games",
     )
 
+    # Injuries command
+    injuries = subparsers.add_parser("injuries", help="Show and refresh injury reports")
+    injuries.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Refresh injury data from nfl_data_py before showing",
+    )
+
     # Parlay command
     parlay = subparsers.add_parser("parlay", help="Generate parlay recommendations")
     parlay.add_argument(
@@ -840,6 +882,8 @@ Examples:
         return cmd_stage(orchestrator, args)
     elif args.command == "weather":
         return cmd_weather(orchestrator, args)
+    elif args.command == "injuries":
+        return cmd_injuries(orchestrator, args)
     elif args.command == "notify":
         return cmd_notify(orchestrator, args)
     elif args.command == "parlay":

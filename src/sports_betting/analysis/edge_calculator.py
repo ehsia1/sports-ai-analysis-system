@@ -8,6 +8,7 @@ import logging
 from ..database import get_session
 from ..database.models import Prop, Player, Game, Prediction, Edge
 from ..data.weather import get_weather_service, GameWeather
+from ..data.injuries import get_injury_service, InjuryStatus
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class EdgeCalculator:
         confidence: float,
         weather: Optional[str] = None,
         weather_warning: Optional[str] = None,
+        injury_warning: Optional[str] = None,
     ) -> Dict[str, str]:
         """
         Generate human-readable reasoning for an edge.
@@ -67,6 +69,9 @@ class EdgeCalculator:
         short_parts = [
             f"Model: {prediction:.1f} vs line {line:.1f} ({abs(diff_pct):.0f}% {direction})"
         ]
+
+        if injury_warning:
+            short_parts.append(f"🏥 {injury_warning}")
 
         if weather_warning:
             short_parts.append(f"⚠️ {weather_warning}")
@@ -104,6 +109,10 @@ class EdgeCalculator:
         # Confidence
         conf_emoji = "🎯" if confidence >= 0.8 else "📍" if confidence >= 0.65 else "⚠️"
         detailed_lines.append(f"{conf_emoji} Model confidence: {confidence:.0%}")
+
+        # Injury status
+        if injury_warning:
+            detailed_lines.append(f"🏥 Injury: {injury_warning} (confidence adjusted)")
 
         # Weather impact
         if weather_warning and "nan" not in str(weather_warning).lower():
@@ -313,6 +322,9 @@ class EdgeCalculator:
         weather_service = get_weather_service()
         week_weather = weather_service.get_weather_for_week(season, week)
 
+        # Get injury service
+        injury_service = get_injury_service()
+
         with get_session() as session:
             # Get all games for this week
             games = session.query(Game).filter_by(
@@ -350,8 +362,23 @@ class EdgeCalculator:
                     if not prediction:
                         continue
 
+                    # Check player injury status
+                    injury_status = injury_service.get_injury_status(
+                        prop.player_id, season, week
+                    )
+                    injury_warning = None
+
+                    # Skip players who are OUT
+                    if injury_status.is_out:
+                        logger.info(f"Skipping OUT player: {injury_status.player_name} ({injury_status.status})")
+                        continue
+
+                    # Apply injury adjustment to confidence
+                    adjusted_confidence = prediction.confidence * injury_status.confidence_multiplier
+                    if injury_status.confidence_multiplier < 1.0:
+                        injury_warning = injury_status.warning_message
+
                     # Apply weather adjustment to confidence for passing/receiving
-                    adjusted_confidence = prediction.confidence
                     weather_warning = None
                     if weather and weather.is_bad_weather:
                         # Reduce confidence for weather-sensitive stats
@@ -407,6 +434,7 @@ class EdgeCalculator:
                             confidence=adjusted_confidence,
                             weather=weather.summary if weather else None,
                             weather_warning=weather_warning,
+                            injury_warning=injury_warning,
                         )
 
                         edge_info = {
@@ -417,6 +445,8 @@ class EdgeCalculator:
                             'market': prop.market,
                             'weather': weather.summary if weather else None,
                             'weather_warning': weather_warning,
+                            'injury_warning': injury_warning,
+                            'injury_status': injury_status.status if injury_status else None,
                             'reasoning': reasoning['short'],
                             'reasoning_detailed': reasoning['detailed'],
                             **edge_analysis,
@@ -571,9 +601,23 @@ class EdgeCalculator:
                 if game not in weather_games:
                     weather_games[game] = weather_str or edge.get('weather_warning')
 
+        # Collect injury warnings
+        injury_players = {}
+        for edge in edges:
+            if edge.get('injury_warning'):
+                injury_players[edge['player']] = edge['injury_warning']
+
         report = []
         report.append(f"BETTING EDGES - {len(edges)} opportunities found")
         report.append("")
+
+        # Injury warnings section
+        if injury_players:
+            report.append("🏥 INJURY CONCERNS:")
+            for player, warning in sorted(injury_players.items()):
+                report.append(f"  {player}: {warning}")
+            report.append("  (Confidence adjusted for injury status)")
+            report.append("")
 
         # Weather warnings section
         if weather_games:
@@ -607,7 +651,16 @@ class EdgeCalculator:
             # Add weather flag (show for any bad weather game)
             weather_str = edge.get('weather', '')
             has_bad_weather = any(w in str(weather_str).lower() for w in ['snow', 'rain']) or edge.get('weather_warning')
-            wx = '❄' if has_bad_weather else ''
+
+            # Add injury flag
+            has_injury = edge.get('injury_warning') is not None
+
+            # Combined flag column (wx = weather, inj = injury)
+            flags = ''
+            if has_injury:
+                flags += '🏥'
+            if has_bad_weather:
+                flags += '❄'
 
             table_edges.append({
                 'side': side,
@@ -619,7 +672,7 @@ class EdgeCalculator:
                 'edge': edge_pct,
                 'odds': odds,
                 'conf': edge['model_confidence'],
-                'wx': wx,
+                'flags': flags,
                 'game': edge['game'],
             })
 
@@ -629,13 +682,13 @@ class EdgeCalculator:
         # Print table header
         report.append(f"Top {min(top_n, len(table_edges))} Edges by EV:")
         report.append("")
-        report.append(f"{'Wx':<2} {'Side':<6} {'Player':<16} {'Market':<8} {'Line':>6} {'Pred':>6} {'EV':>7} {'Edge':>6} {'Odds':>6}")
+        report.append(f"{'':3} {'Side':<6} {'Player':<16} {'Market':<8} {'Line':>6} {'Pred':>6} {'EV':>7} {'Edge':>6} {'Odds':>6}")
         report.append("-" * 76)
 
         # Print top edges
         for e in table_edges[:top_n]:
             report.append(
-                f"{e['wx']:<2} {e['side']:<6} {e['player']:<16} {e['market']:<8} "
+                f"{e['flags']:<3} {e['side']:<6} {e['player']:<16} {e['market']:<8} "
                 f"{e['line']:>6.1f} {e['pred']:>6.1f} {e['ev']:>+6.1f}% {e['edge']:>+5.1f}% {e['odds']:>+5d}"
             )
 
@@ -679,4 +732,6 @@ class EdgeCalculator:
             'reasoning_detailed': edge.get('reasoning_detailed', ''),
             'weather': edge.get('weather'),
             'weather_warning': edge.get('weather_warning'),
+            'injury_warning': edge.get('injury_warning'),
+            'injury_status': edge.get('injury_status'),
         }

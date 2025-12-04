@@ -78,6 +78,7 @@ sports-betting/
 | Change workflow stages | `src/sports_betting/workflow/stages.py` |
 | Add health check | `src/sports_betting/monitoring/health.py` |
 | Modify weather logic | `src/sports_betting/data/weather.py` |
+| Modify injury logic | `src/sports_betting/data/injuries.py` |
 
 ### Database Models
 
@@ -122,6 +123,10 @@ python scripts/orchestrate.py health --notify
 
 # Weather management
 python scripts/orchestrate.py weather --fetch
+
+# Injury reports (fetches from ESPN if DB empty)
+python scripts/orchestrate.py injuries
+python scripts/orchestrate.py injuries --refresh  # Refresh from nfl_data_py
 ```
 
 ## Notion Documentation
@@ -149,6 +154,28 @@ parent_page_id = "2bbac7292af381888e48fb4f4876a9a8"
 - Architecture decisions
 - Weekly results summaries
 - Model performance metrics
+
+### Documentation Requirement
+
+**IMPORTANT**: Always document ALL findings and analysis in Notion.
+
+After completing any analysis, backtest, or investigation, update the appropriate Notion page:
+
+| Analysis Type | Notion Page | Page ID |
+|---------------|-------------|---------|
+| Weekly predictions & results | Weekly Results & Analysis | `2beac7292af3813099d4f4bc179c9caf` |
+| Backtest results | Weekly Results & Analysis | `2beac7292af3813099d4f4bc179c9caf` |
+| Filter effectiveness | Weekly Results & Analysis | `2beac7292af3813099d4f4bc179c9caf` |
+| Model performance insights | Weekly Results & Analysis | `2beac7292af3813099d4f4bc179c9caf` |
+| System changes & features | Production Roadmap | `2bbac7292af381888e48fb4f4876a9a8` |
+
+Document these types of findings:
+- Weekly edge predictions before games
+- Post-game results (win/loss, ROI)
+- Backtest comparisons (e.g., "with filters" vs "without")
+- Counter-intuitive discoveries (e.g., confidence threshold analysis)
+- Filter/model improvement recommendations
+- Any data that could inform future decisions
 
 ### Creating New Pages
 

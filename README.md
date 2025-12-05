@@ -102,6 +102,7 @@ python scripts/orchestrate.py post-game --show-pending  # Show trades that could
 |---------|-------------|
 | `results` | View and manage paper trade results |
 | `history` | View historical performance summaries |
+| `dashboard` | View result tracking dashboard with breakdowns |
 | `parlay` | Generate parlay recommendations |
 
 #### `results` Options
@@ -119,6 +120,15 @@ python scripts/orchestrate.py history --generate-all  # Generate all missing sum
 python scripts/orchestrate.py history --breakdown     # Include market breakdown
 python scripts/orchestrate.py history --trends        # Show performance trends
 ```
+
+#### `dashboard` Options
+```bash
+python scripts/orchestrate.py dashboard               # View full dashboard (all weeks)
+python scripts/orchestrate.py dashboard --week 13     # Dashboard for specific week
+python scripts/orchestrate.py dashboard --recommend   # Include filter recommendations
+```
+
+Shows breakdowns by: direction (OVER/UNDER), market, position, player tier (elite/other), edge %, and model confidence with actionable insights.
 
 #### `parlay` Options
 ```bash

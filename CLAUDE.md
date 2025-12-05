@@ -139,6 +139,10 @@ python scripts/orchestrate.py injuries --refresh  # Refresh from nfl_data_py
 python scripts/orchestrate.py history                  # View season history
 python scripts/orchestrate.py history --generate-all   # Generate all summaries
 python scripts/orchestrate.py history --trends         # Show trends
+
+# Result tracking dashboard
+python scripts/orchestrate.py dashboard                # View full dashboard
+python scripts/orchestrate.py dashboard --recommend    # With filter recommendations
 ```
 
 ## Notion Documentation

@@ -594,6 +594,49 @@ def cmd_history(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dashboard(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
+    """Display result tracking dashboard with breakdowns."""
+    from src.sports_betting.tracking import get_dashboard
+
+    status = orchestrator.get_status()
+    season = args.season or status['season']
+    week = args.week if args.week else None  # None = all weeks
+
+    dashboard = get_dashboard()
+
+    # Load data
+    data = dashboard.load_data(season, week=week)
+
+    if data.total_bets == 0:
+        print()
+        print("No evaluated trades found.")
+        print()
+        print("Run post-game workflow to evaluate trades:")
+        print("  orchestrate.py post-game")
+        print()
+        return 0
+
+    # Generate and print report
+    report = dashboard.format_full_report(data)
+    print(report)
+
+    # Show filter recommendations if requested
+    if args.recommend:
+        print("=" * 70)
+        print("FILTER RECOMMENDATIONS")
+        print("=" * 70)
+        print()
+        recommendations = dashboard.get_best_filters(data)
+        if recommendations:
+            for rec in recommendations.values():
+                print(f"• {rec}")
+        else:
+            print("Insufficient data for recommendations (need 5+ bets per category)")
+        print()
+
+    return 0
+
+
 def cmd_health(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     """Run health checks."""
     from src.sports_betting.monitoring import run_health_check
@@ -918,6 +961,14 @@ Examples:
         help="Show performance trends",
     )
 
+    # Dashboard command
+    dashboard = subparsers.add_parser("dashboard", help="View result tracking dashboard")
+    dashboard.add_argument(
+        "--recommend",
+        action="store_true",
+        help="Show filter recommendations based on results",
+    )
+
     # Parlay command
     parlay = subparsers.add_parser("parlay", help="Generate parlay recommendations")
     parlay.add_argument(
@@ -991,6 +1042,8 @@ Examples:
         return cmd_injuries(orchestrator, args)
     elif args.command == "history":
         return cmd_history(orchestrator, args)
+    elif args.command == "dashboard":
+        return cmd_dashboard(orchestrator, args)
     elif args.command == "notify":
         return cmd_notify(orchestrator, args)
     elif args.command == "parlay":

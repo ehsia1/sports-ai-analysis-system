@@ -637,6 +637,97 @@ def cmd_dashboard(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_filters(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
+    """Manage dynamic bet filters based on historical performance."""
+    from src.sports_betting.analysis import get_filter_service, DynamicFilterConfig
+
+    status = orchestrator.get_status()
+    season = args.season or status['season']
+
+    filter_service = get_filter_service()
+
+    # Configure thresholds if provided
+    if args.min_sample or args.skip_below or args.prioritize_above:
+        config = DynamicFilterConfig(
+            min_sample_size=args.min_sample or 15,
+            skip_below_win_rate=args.skip_below or 0.35,
+            prioritize_above_win_rate=args.prioritize_above or 0.55,
+        )
+        filter_service.config = config
+
+    # Generate/refresh filters
+    if args.generate:
+        print()
+        print("=" * 70)
+        print(f"GENERATING DYNAMIC FILTERS - {season} Season")
+        print("=" * 70)
+        print()
+
+        min_week = args.min_week
+        max_week = args.max_week
+
+        rules = filter_service.generate_rules(
+            season=season,
+            min_week=min_week,
+            max_week=max_week,
+        )
+
+        if rules:
+            filter_service.save_rules()
+            print(f"Generated {len(rules)} filter rules")
+            print()
+            print(filter_service.format_report())
+        else:
+            print("No filter rules generated (insufficient data or all categories passing)")
+            print()
+            print("Config used:")
+            print(f"  Min sample size: {filter_service.config.min_sample_size}")
+            print(f"  Skip below: {filter_service.config.skip_below_win_rate:.0%}")
+            print(f"  Prioritize above: {filter_service.config.prioritize_above_win_rate:.0%}")
+        print()
+        return 0
+
+    # Clear filters
+    if args.clear:
+        print()
+        filter_service._rules = []
+        filter_service.save_rules()
+        print("Dynamic filters cleared.")
+        print()
+        return 0
+
+    # Show current filters (default)
+    print()
+    print("=" * 70)
+    print("DYNAMIC BET FILTERS")
+    print("=" * 70)
+    print()
+
+    if not filter_service._rules:
+        print("No dynamic filter rules active.")
+        print()
+        print("Generate rules based on historical performance:")
+        print("  orchestrate.py filters --generate")
+        print()
+        print("Configure thresholds:")
+        print("  orchestrate.py filters --generate --min-sample 20 --skip-below 0.40")
+        print()
+        return 0
+
+    print(filter_service.format_report())
+    print()
+
+    # Show summary for EdgeCalculator integration
+    if args.verbose:
+        print("EDGE CALCULATOR INTEGRATION:")
+        summary = filter_service.get_filter_summary_for_edge_calculator()
+        for key, value in summary.items():
+            print(f"  {key}: {value}")
+        print()
+
+    return 0
+
+
 def cmd_health(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     """Run health checks."""
     from src.sports_betting.monitoring import run_health_check
@@ -969,6 +1060,49 @@ Examples:
         help="Show filter recommendations based on results",
     )
 
+    # Filters command
+    filters = subparsers.add_parser("filters", help="Manage dynamic bet filters")
+    filters.add_argument(
+        "--generate",
+        action="store_true",
+        help="Generate/refresh filters from historical data",
+    )
+    filters.add_argument(
+        "--clear",
+        action="store_true",
+        help="Clear all dynamic filters",
+    )
+    filters.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed filter integration info",
+    )
+    filters.add_argument(
+        "--min-sample",
+        type=int,
+        help="Minimum sample size to create filter rule (default: 15)",
+    )
+    filters.add_argument(
+        "--skip-below",
+        type=float,
+        help="Skip categories with win rate below this (default: 0.35)",
+    )
+    filters.add_argument(
+        "--prioritize-above",
+        type=float,
+        help="Prioritize categories with win rate above this (default: 0.55)",
+    )
+    filters.add_argument(
+        "--min-week",
+        type=int,
+        help="Only include trades from this week onward",
+    )
+    filters.add_argument(
+        "--max-week",
+        type=int,
+        help="Only include trades up to this week",
+    )
+
     # Parlay command
     parlay = subparsers.add_parser("parlay", help="Generate parlay recommendations")
     parlay.add_argument(
@@ -1044,6 +1178,8 @@ Examples:
         return cmd_history(orchestrator, args)
     elif args.command == "dashboard":
         return cmd_dashboard(orchestrator, args)
+    elif args.command == "filters":
+        return cmd_filters(orchestrator, args)
     elif args.command == "notify":
         return cmd_notify(orchestrator, args)
     elif args.command == "parlay":

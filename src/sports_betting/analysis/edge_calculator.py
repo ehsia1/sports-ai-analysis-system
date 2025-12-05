@@ -10,6 +10,7 @@ from ..database.models import Prop, Player, Game, Prediction, Edge
 from ..data.weather import get_weather_service, GameWeather
 from ..data.injuries import get_injury_service, InjuryStatus
 from ..data.matchup import get_matchup_service, MatchupContext
+from .dynamic_filters import get_filter_service, DynamicFilterService
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +55,18 @@ class EdgeCalculator:
         # 'min_rb_over_edge': 0.05,  # RB OVER performed well (71.4%)
     }
 
-    def __init__(self):
+    def __init__(self, use_dynamic_filters: bool = True):
         self.min_edge = 0.03  # Minimum 3% edge to consider
         self.min_confidence = 0.65  # Minimum model confidence
+        self.use_dynamic_filters = use_dynamic_filters
+        self._filter_service: Optional[DynamicFilterService] = None
+
+    @property
+    def filter_service(self) -> Optional[DynamicFilterService]:
+        """Lazy load dynamic filter service."""
+        if self.use_dynamic_filters and self._filter_service is None:
+            self._filter_service = get_filter_service()
+        return self._filter_service if self.use_dynamic_filters else None
 
     def generate_reasoning(
         self,
@@ -487,6 +497,22 @@ class EdgeCalculator:
                             not edge_analysis['under']['should_bet']):
                             logger.info(f"Skipping OVER bet on TE: {player.name}")
                             continue
+
+                        # Dynamic filters (auto-adjusted based on historical win rates)
+                        if self.filter_service:
+                            # Determine direction for filter check
+                            check_direction = 'over' if edge_analysis['over']['should_bet'] else 'under'
+
+                            should_skip, skip_reason = self.filter_service.should_skip(
+                                direction=check_direction,
+                                position=player.position,
+                                market=prop.market,
+                                player_name=player.name,
+                            )
+
+                            if should_skip:
+                                logger.info(f"Dynamic filter skip: {player.name} {check_direction.upper()} - {skip_reason}")
+                                continue
 
                         # Determine which side has the edge
                         if edge_analysis['over']['should_bet']:

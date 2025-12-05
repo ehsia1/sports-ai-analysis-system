@@ -72,6 +72,7 @@ sports-betting/
 | Add new CLI command | `scripts/orchestrate.py` + `README.md` (CLI Reference section) |
 | Modify edge calculation | `src/sports_betting/analysis/edge_calculator.py` |
 | Change parlay logic | `src/sports_betting/analysis/parlay_generator.py` |
+| Modify dynamic filters | `src/sports_betting/analysis/dynamic_filters.py` |
 | Update Discord messages | `src/sports_betting/notifications/discord.py` |
 | Add new config option | `src/sports_betting/config/settings.py` + `.env` |
 | Modify prediction model | `src/sports_betting/ml/stat_predictors.py` |
@@ -143,6 +144,11 @@ python scripts/orchestrate.py history --trends         # Show trends
 # Result tracking dashboard
 python scripts/orchestrate.py dashboard                # View full dashboard
 python scripts/orchestrate.py dashboard --recommend    # With filter recommendations
+
+# Dynamic bet filters
+python scripts/orchestrate.py filters                  # View current filters
+python scripts/orchestrate.py filters --generate      # Generate from historical data
+python scripts/orchestrate.py filters --clear         # Clear all filters
 ```
 
 ## Notion Documentation

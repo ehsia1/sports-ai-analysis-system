@@ -103,6 +103,7 @@ python scripts/orchestrate.py post-game --show-pending  # Show trades that could
 | `results` | View and manage paper trade results |
 | `history` | View historical performance summaries |
 | `dashboard` | View result tracking dashboard with breakdowns |
+| `filters` | Manage dynamic bet filters based on historical performance |
 | `parlay` | Generate parlay recommendations |
 
 #### `results` Options
@@ -129,6 +130,27 @@ python scripts/orchestrate.py dashboard --recommend   # Include filter recommend
 ```
 
 Shows breakdowns by: direction (OVER/UNDER), market, position, player tier (elite/other), edge %, and model confidence with actionable insights.
+
+#### `filters` Options
+```bash
+python scripts/orchestrate.py filters                      # View current dynamic filters
+python scripts/orchestrate.py filters --generate          # Generate filters from historical data
+python scripts/orchestrate.py filters --clear             # Clear all dynamic filters
+python scripts/orchestrate.py filters --generate --min-sample 20  # Require 20+ bets per category
+python scripts/orchestrate.py filters --generate --skip-below 0.40  # Skip categories <40% win rate
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--generate` | - | Generate/refresh filters from historical paper trades |
+| `--clear` | - | Clear all dynamic filters |
+| `--min-sample` | 15 | Minimum bets per category to create filter |
+| `--skip-below` | 0.35 | Skip categories with win rate below this |
+| `--prioritize-above` | 0.55 | Prioritize categories with win rate above this |
+| `--min-week` | - | Only include trades from this week onward |
+| `--max-week` | - | Only include trades up to this week |
+
+Dynamic filters automatically skip bet types with poor historical win rates (e.g., elite player UNDERs, TE OVERs) and prioritize profitable patterns (e.g., RB OVERs, non-elite OVERs).
 
 #### `parlay` Options
 ```bash

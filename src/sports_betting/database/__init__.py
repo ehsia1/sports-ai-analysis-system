@@ -18,6 +18,7 @@ from .models import (
     RosterChange,
     ShadowLine,
     Team,
+    WeeklySummary,
 )
 from .session import get_session, init_db
 
@@ -39,6 +40,7 @@ __all__ = [
     "RosterChange",
     "ShadowLine",
     "Team",
+    "WeeklySummary",
     "get_session",
     "init_db",
 ]

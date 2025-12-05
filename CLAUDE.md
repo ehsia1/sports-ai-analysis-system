@@ -69,7 +69,7 @@ sports-betting/
 
 | Task | File(s) to Edit |
 |------|-----------------|
-| Add new CLI command | `scripts/orchestrate.py` |
+| Add new CLI command | `scripts/orchestrate.py` + `README.md` (CLI Reference section) |
 | Modify edge calculation | `src/sports_betting/analysis/edge_calculator.py` |
 | Change parlay logic | `src/sports_betting/analysis/parlay_generator.py` |
 | Update Discord messages | `src/sports_betting/notifications/discord.py` |
@@ -79,6 +79,13 @@ sports-betting/
 | Add health check | `src/sports_betting/monitoring/health.py` |
 | Modify weather logic | `src/sports_betting/data/weather.py` |
 | Modify injury logic | `src/sports_betting/data/injuries.py` |
+
+### README Updates (Required)
+
+**IMPORTANT**: When adding or modifying CLI commands/options, **always update README.md**:
+- Add new commands to the appropriate section in "CLI Reference"
+- Document all new options with examples
+- The README is the user-facing documentation - keep it current!
 
 ### Database Models
 
@@ -127,6 +134,11 @@ python scripts/orchestrate.py weather --fetch
 # Injury reports (fetches from ESPN if DB empty)
 python scripts/orchestrate.py injuries
 python scripts/orchestrate.py injuries --refresh  # Refresh from nfl_data_py
+
+# Historical performance
+python scripts/orchestrate.py history                  # View season history
+python scripts/orchestrate.py history --generate-all   # Generate all summaries
+python scripts/orchestrate.py history --trends         # Show trends
 ```
 
 ## Notion Documentation

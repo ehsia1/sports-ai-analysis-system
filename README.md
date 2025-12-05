@@ -66,6 +66,123 @@ python scripts/orchestrate.py health
 
 The orchestrator automatically detects the current NFL week and handles all stages.
 
+## CLI Reference
+
+All commands support global options:
+- `--week N` - Override week number (default: auto-detect)
+- `--season YYYY` - Override season year (default: auto-detect)
+
+### Core Workflow Commands
+
+| Command | Description |
+|---------|-------------|
+| `status` | Show current system status |
+| `pre-game` | Run pre-game workflow (odds → predictions → edges) |
+| `post-game` | Collect results and score predictions |
+| `full` | Run complete pre-game + post-game workflow |
+
+#### `pre-game` Options
+```bash
+python scripts/orchestrate.py pre-game
+python scripts/orchestrate.py pre-game --force        # Force refresh cached data
+python scripts/orchestrate.py pre-game --top 30       # Show top 30 edges (default: 20)
+python scripts/orchestrate.py pre-game --no-notify    # Skip Discord notifications
+python scripts/orchestrate.py pre-game --no-parlay    # Skip automatic parlay generation
+```
+
+#### `post-game` Options
+```bash
+python scripts/orchestrate.py post-game
+python scripts/orchestrate.py post-game --show-pending  # Show trades that couldn't be auto-scored
+```
+
+### Analysis Commands
+
+| Command | Description |
+|---------|-------------|
+| `results` | View and manage paper trade results |
+| `history` | View historical performance summaries |
+| `parlay` | Generate parlay recommendations |
+
+#### `results` Options
+```bash
+python scripts/orchestrate.py results
+python scripts/orchestrate.py results -v                    # Verbose: show all trades
+python scripts/orchestrate.py results --score 123 45.5      # Manually score trade ID 123
+```
+
+#### `history` Options
+```bash
+python scripts/orchestrate.py history                  # View season history
+python scripts/orchestrate.py history --generate      # Generate summary for current week
+python scripts/orchestrate.py history --generate-all  # Generate all missing summaries
+python scripts/orchestrate.py history --breakdown     # Include market breakdown
+python scripts/orchestrate.py history --trends        # Show performance trends
+```
+
+#### `parlay` Options
+```bash
+python scripts/orchestrate.py parlay
+python scripts/orchestrate.py parlay --notify         # Send to Discord
+python scripts/orchestrate.py parlay --max-legs 10    # Up to 10-leg parlays
+python scripts/orchestrate.py parlay --save           # Save to database
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--top N` | 5 | Parlays to show per leg count |
+| `--max-legs N` | 5 | Maximum legs per parlay (2-20) |
+| `--min-prob` | 0.55 | Minimum probability per leg |
+| `--min-leg-ev` | 5.0 | Minimum EV% per leg |
+| `--min-parlay-ev` | 15.0 | Minimum combined EV% |
+| `--max-candidates` | 30 | Max legs to consider |
+
+### Utility Commands
+
+| Command | Description |
+|---------|-------------|
+| `stage` | Run a single workflow stage |
+| `health` | Run system health checks |
+| `weather` | Set or fetch weather for games |
+| `injuries` | Show and refresh injury reports |
+| `notify` | Send Discord notifications |
+
+#### `stage` Options
+Run individual workflow stages:
+```bash
+python scripts/orchestrate.py stage collect_odds
+python scripts/orchestrate.py stage generate_predictions
+python scripts/orchestrate.py stage calculate_edges
+python scripts/orchestrate.py stage refresh_schedule
+python scripts/orchestrate.py stage score_results
+python scripts/orchestrate.py stage collect_odds --force  # Force refresh
+```
+
+#### `health` Options
+```bash
+python scripts/orchestrate.py health
+python scripts/orchestrate.py health --notify  # Send Discord alert if unhealthy
+```
+
+#### `weather` Options
+```bash
+python scripts/orchestrate.py weather                           # Show current weather
+python scripts/orchestrate.py weather --fetch                   # Fetch from Weather.gov
+python scripts/orchestrate.py weather SF CLE rain --temp 35     # Manual override
+python scripts/orchestrate.py weather SF CLE snow --wind 20     # Snow with wind
+```
+
+#### `injuries` Options
+```bash
+python scripts/orchestrate.py injuries
+python scripts/orchestrate.py injuries --refresh  # Refresh from nfl_data_py
+```
+
+#### `notify` Options
+```bash
+python scripts/orchestrate.py notify --test  # Send test notification
+```
+
 ## Project Structure
 
 ```
@@ -84,74 +201,6 @@ sports-betting/
 ├── data/                      # SQLite database
 └── tests/                     # 100 tests
 ```
-
-## Usage Examples
-
-### Full Pre-Game Workflow
-
-```bash
-python scripts/orchestrate.py pre-game
-
-# Output shows edges like:
-# OVER  Keon Coleman  Rec Yards  25.5  35.2  +38.1%  -118
-# UNDER Taysom Hill   Rush Yards 22.5  14.7  -34.7%  -110
-```
-
-### Run Individual Stages
-
-```bash
-# Just collect odds
-python scripts/orchestrate.py stage collect_odds
-
-# Just generate predictions
-python scripts/orchestrate.py stage generate_predictions
-
-# Override week number
-python scripts/orchestrate.py pre-game --week 14
-```
-
-### Check System Health
-
-```bash
-python scripts/orchestrate.py health
-
-# With Discord notification on issues
-python scripts/orchestrate.py health --notify
-```
-
-### Generate Parlays
-
-Build parlay combinations from your best edges:
-
-```bash
-# Generate parlays (2-5 legs)
-python scripts/orchestrate.py parlay
-
-# Send top parlays to Discord
-python scripts/orchestrate.py parlay --notify
-
-# Customize parlay generation
-python scripts/orchestrate.py parlay --max-legs 4 --min-parlay-ev 20 --notify
-```
-
-**Options:**
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--top N` | 5 | Number of parlays to show per leg count |
-| `--max-legs N` | 5 | Maximum legs per parlay (2-5) |
-| `--min-prob` | 0.55 | Minimum probability per leg |
-| `--min-leg-ev` | 5.0 | Minimum EV% per individual leg |
-| `--min-parlay-ev` | 15.0 | Minimum combined EV% for parlay |
-| `--max-candidates` | 30 | Max legs to consider (limits combinatorics) |
-| `--notify` | false | Send top parlays to Discord |
-| `--save` | false | Store parlays in database |
-
-The parlay generator:
-- Filters to high-probability, high-EV legs only
-- Excludes correlated legs (same player, same-game passing stats)
-- Calculates combined odds and joint probability
-- Ranks by expected value
 
 ## Model Training
 

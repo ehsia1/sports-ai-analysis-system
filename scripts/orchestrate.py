@@ -512,6 +512,88 @@ def cmd_injuries(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_history(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
+    """View and generate historical performance summaries."""
+    from src.sports_betting.tracking import get_historical_tracker
+
+    status = orchestrator.get_status()
+    season = args.season or status['season']
+    tracker = get_historical_tracker()
+
+    # Generate summary for specific week if requested
+    if args.generate:
+        week = args.week or status['week']
+        print()
+        print(f"Generating summary for {season} Week {week}...")
+        print()
+
+        summary = tracker.generate_and_save_summary(season, week)
+        if summary:
+            print(f"✓ Summary saved: {summary['wins']}-{summary['losses']} "
+                  f"({summary['win_rate_pct']:.1f}%), ${summary['total_profit']:+.2f}")
+        else:
+            print("No evaluated trades found for this week.")
+        print()
+        return 0
+
+    # Generate all missing summaries for season
+    if args.generate_all:
+        print()
+        print(f"Generating summaries for all {season} weeks with data...")
+        print()
+
+        for week in range(1, 19):  # Weeks 1-18
+            existing = tracker.get_summary(season, week)
+            if existing:
+                print(f"  Week {week}: Already exists ({existing['wins']}-{existing['losses']})")
+                continue
+
+            summary = tracker.generate_and_save_summary(season, week)
+            if summary:
+                print(f"  Week {week}: Generated ({summary['wins']}-{summary['losses']}, "
+                      f"${summary['total_profit']:+.2f})")
+
+        print()
+        print("Done!")
+        print()
+        return 0
+
+    # Show history report
+    print()
+    print("=" * 70)
+    print(f"HISTORICAL PERFORMANCE - {season} Season")
+    print("=" * 70)
+
+    summaries = tracker.get_season_summaries(season)
+    if not summaries:
+        print()
+        print("No historical data found.")
+        print()
+        print("Generate summaries with:")
+        print("  orchestrate.py history --generate-all")
+        print()
+        return 0
+
+    report = tracker.format_history_report(summaries, include_breakdowns=args.breakdown)
+    print(report)
+
+    # Show trends if requested
+    if args.trends:
+        print()
+        print("TRENDS:")
+        trends = tracker.get_performance_trends(season)
+        if trends:
+            print(f"  Weeks tracked: {trends['weeks_tracked']}")
+            print(f"  Avg weekly profit: ${trends['avg_weekly_profit']:.2f}")
+            print(f"  Best week: Week {trends['best_week']['week']} (${trends['best_week']['total_profit']:+.2f})")
+            print(f"  Worst week: Week {trends['worst_week']['week']} (${trends['worst_week']['total_profit']:+.2f})")
+            print(f"  Profit trend: {trends['profit_trend']}")
+            print(f"  Win rate trend: {trends['win_rate_trend']}")
+        print()
+
+    return 0
+
+
 def cmd_health(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     """Run health checks."""
     from src.sports_betting.monitoring import run_health_check
@@ -813,6 +895,29 @@ Examples:
         help="Refresh injury data from nfl_data_py before showing",
     )
 
+    # History command
+    history = subparsers.add_parser("history", help="View historical performance summaries")
+    history.add_argument(
+        "--generate",
+        action="store_true",
+        help="Generate summary for current week",
+    )
+    history.add_argument(
+        "--generate-all",
+        action="store_true",
+        help="Generate summaries for all weeks with data",
+    )
+    history.add_argument(
+        "--breakdown",
+        action="store_true",
+        help="Include market breakdown in report",
+    )
+    history.add_argument(
+        "--trends",
+        action="store_true",
+        help="Show performance trends",
+    )
+
     # Parlay command
     parlay = subparsers.add_parser("parlay", help="Generate parlay recommendations")
     parlay.add_argument(
@@ -884,6 +989,8 @@ Examples:
         return cmd_weather(orchestrator, args)
     elif args.command == "injuries":
         return cmd_injuries(orchestrator, args)
+    elif args.command == "history":
+        return cmd_history(orchestrator, args)
     elif args.command == "notify":
         return cmd_notify(orchestrator, args)
     elif args.command == "parlay":

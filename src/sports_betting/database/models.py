@@ -490,3 +490,62 @@ class PaperTrade(Base):
     game: Mapped["Game"] = relationship("Game")
     player: Mapped["Player"] = relationship("Player")
     prop: Mapped[Optional["Prop"]] = relationship("Prop")
+
+
+class WeeklySummary(Base):
+    """Aggregated weekly betting performance summary for historical tracking."""
+
+    __tablename__ = "weekly_summaries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    season: Mapped[int] = mapped_column(Integer, nullable=False)
+    week: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # Trading metrics
+    total_bets: Mapped[int] = mapped_column(Integer, default=0)
+    wins: Mapped[int] = mapped_column(Integer, default=0)
+    losses: Mapped[int] = mapped_column(Integer, default=0)
+    pushes: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Financial metrics
+    total_staked: Mapped[float] = mapped_column(Float, default=0.0)
+    total_profit: Mapped[float] = mapped_column(Float, default=0.0)
+    roi_pct: Mapped[float] = mapped_column(Float, default=0.0)
+
+    # Win rates
+    win_rate_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    over_wins: Mapped[int] = mapped_column(Integer, default=0)
+    over_losses: Mapped[int] = mapped_column(Integer, default=0)
+    under_wins: Mapped[int] = mapped_column(Integer, default=0)
+    under_losses: Mapped[int] = mapped_column(Integer, default=0)
+
+    # By market breakdown (JSON: {market: {wins, losses, profit, roi}})
+    market_breakdown: Mapped[Optional[dict]] = mapped_column(JSON)
+
+    # By position breakdown (JSON: {position: {wins, losses, profit, roi}})
+    position_breakdown: Mapped[Optional[dict]] = mapped_column(JSON)
+
+    # Edge analysis
+    avg_edge_pct: Mapped[Optional[float]] = mapped_column(Float)
+    avg_confidence: Mapped[Optional[float]] = mapped_column(Float)
+    edges_above_5pct_win_rate: Mapped[Optional[float]] = mapped_column(Float)
+    edges_below_5pct_win_rate: Mapped[Optional[float]] = mapped_column(Float)
+
+    # Notable bets
+    best_bet_player: Mapped[Optional[str]] = mapped_column(String(100))
+    best_bet_profit: Mapped[Optional[float]] = mapped_column(Float)
+    worst_bet_player: Mapped[Optional[str]] = mapped_column(String(100))
+    worst_bet_loss: Mapped[Optional[float]] = mapped_column(Float)
+
+    # Cumulative season totals (running totals up to this week)
+    season_total_bets: Mapped[Optional[int]] = mapped_column(Integer)
+    season_total_profit: Mapped[Optional[float]] = mapped_column(Float)
+    season_roi_pct: Mapped[Optional[float]] = mapped_column(Float)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    __table_args__ = (UniqueConstraint("season", "week", name="uq_weekly_summary"),)

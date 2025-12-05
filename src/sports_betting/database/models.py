@@ -157,6 +157,14 @@ class Game(Base):
     wind_speed: Mapped[Optional[float]] = mapped_column(Float)
     precipitation: Mapped[Optional[float]] = mapped_column(Float)
     is_dome: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Game-level betting odds (for matchup context)
+    spread: Mapped[Optional[float]] = mapped_column(Float)  # Home team spread (negative = favorite)
+    total: Mapped[Optional[float]] = mapped_column(Float)  # Over/under total points
+    home_moneyline: Mapped[Optional[int]] = mapped_column(Integer)  # American odds
+    away_moneyline: Mapped[Optional[int]] = mapped_column(Integer)
+    odds_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -175,6 +183,41 @@ class Game(Base):
     )
 
     __table_args__ = (UniqueConstraint("season", "week", "home_team_id", "away_team_id"),)
+
+    @property
+    def home_implied_total(self) -> Optional[float]:
+        """Calculate implied points for home team: (total - spread) / 2."""
+        if self.total is not None and self.spread is not None:
+            return (self.total - self.spread) / 2
+        return None
+
+    @property
+    def away_implied_total(self) -> Optional[float]:
+        """Calculate implied points for away team: (total + spread) / 2."""
+        if self.total is not None and self.spread is not None:
+            return (self.total + self.spread) / 2
+        return None
+
+    @property
+    def home_is_favorite(self) -> Optional[bool]:
+        """Check if home team is favored (negative spread)."""
+        if self.spread is not None:
+            return self.spread < 0
+        return None
+
+    @property
+    def favorite_team_id(self) -> Optional[int]:
+        """Get the team_id of the favorite."""
+        if self.spread is not None:
+            return self.home_team_id if self.spread < 0 else self.away_team_id
+        return None
+
+    @property
+    def spread_magnitude(self) -> Optional[float]:
+        """Get absolute value of spread (how lopsided the matchup is)."""
+        if self.spread is not None:
+            return abs(self.spread)
+        return None
 
 
 class Book(Base):

@@ -200,11 +200,25 @@ class OddsCollectionStage(WorkflowStage):
 
             self.logger.info(f"Stored {props_stored} props")
 
+            # Also fetch game-level odds (spreads, totals, moneylines) for matchup context
+            # This costs 3 additional credits (spreads + totals + h2h)
+            games_updated = 0
+            try:
+                self.logger.info("Fetching game odds (spreads, totals, moneylines)...")
+                game_odds = client.get_game_odds(markets=["spreads", "totals", "h2h"])
+                if game_odds:
+                    games_updated = client.store_game_odds_in_database(game_odds)
+                    self.logger.info(f"Updated {games_updated} games with odds data")
+            except Exception as e:
+                self.logger.warning(f"Failed to fetch game odds: {e}")
+                # Don't fail the whole stage if game odds fail
+
             return self._create_result(
                 status=StageStatus.SUCCESS,
-                message=f"Collected {props_stored} props from {len(event_ids)} games",
+                message=f"Collected {props_stored} props from {len(event_ids)} games, updated {games_updated} game odds",
                 data={
                     "props_stored": props_stored,
+                    "games_updated": games_updated,
                     "events_count": len(event_ids),
                     "credits_used": odds_data.get("total_cost", 0),
                     "credits_remaining": client.credits_remaining,

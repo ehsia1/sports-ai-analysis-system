@@ -125,6 +125,144 @@ class OddsAPIClient:
         logger.info("Fetching NFL games")
         return self._make_request("sports/americanfootball_nfl/events", {}) or []
 
+    def get_game_odds(
+        self,
+        markets: Optional[List[str]] = None,
+        bookmakers: Optional[List[str]] = None,
+    ) -> Optional[List[Dict]]:
+        """
+        Get NFL game-level odds (spreads, totals, moneylines).
+
+        Cost: 1 credit per market per region
+        Example: spreads + totals + h2h = 3 credits
+
+        Args:
+            markets: List of markets (h2h, spreads, totals). Defaults to all three.
+            bookmakers: Specific bookmakers to fetch from.
+
+        Returns:
+            List of game odds data
+        """
+        if markets is None:
+            markets = ["h2h", "spreads", "totals"]
+
+        params = {
+            "regions": self.regions,
+            "markets": ",".join(markets),
+            "oddsFormat": self.oddsFormat,
+        }
+
+        if bookmakers:
+            params["bookmakers"] = ",".join(bookmakers)
+
+        logger.info(f"Fetching game odds for markets: {markets}")
+        result = self._make_request("sports/americanfootball_nfl/odds", params)
+
+        return result if result else []
+
+    def store_game_odds_in_database(self, odds_data: List[Dict]) -> int:
+        """
+        Store game-level odds (spreads, totals, moneylines) in the database.
+
+        Updates Game records with spread, total, and moneyline data.
+
+        Returns:
+            Number of games updated
+        """
+        if not odds_data:
+            logger.warning("No game odds data to store")
+            return 0
+
+        updated_count = 0
+
+        with get_session() as session:
+            from ..database.models import Team
+
+            for event in odds_data:
+                home_team_name = event.get('home_team')
+                away_team_name = event.get('away_team')
+
+                if not home_team_name or not away_team_name:
+                    continue
+
+                # Find the game by external_id first, then by team names
+                game = None
+                if event.get('id'):
+                    game = session.query(Game).filter_by(
+                        external_id=event.get('id')
+                    ).first()
+
+                if not game:
+                    home_team = session.query(Team).filter_by(name=home_team_name).first()
+                    away_team = session.query(Team).filter_by(name=away_team_name).first()
+
+                    if home_team and away_team:
+                        game = session.query(Game).filter_by(
+                            home_team_id=home_team.id,
+                            away_team_id=away_team.id
+                        ).order_by(Game.game_date.desc()).first()
+
+                if not game:
+                    logger.debug(f"Game not found: {away_team_name} @ {home_team_name}")
+                    continue
+
+                # Extract odds from bookmakers (use consensus/first available)
+                spread = None
+                total = None
+                home_ml = None
+                away_ml = None
+
+                for bookmaker in event.get('bookmakers', []):
+                    for market in bookmaker.get('markets', []):
+                        market_key = market.get('key')
+                        outcomes = market.get('outcomes', [])
+
+                        if market_key == 'spreads':
+                            for outcome in outcomes:
+                                if outcome.get('name') == home_team_name:
+                                    spread = outcome.get('point')
+                                    break
+
+                        elif market_key == 'totals':
+                            for outcome in outcomes:
+                                if outcome.get('name') == 'Over':
+                                    total = outcome.get('point')
+                                    break
+
+                        elif market_key == 'h2h':
+                            for outcome in outcomes:
+                                if outcome.get('name') == home_team_name:
+                                    home_ml = outcome.get('price')
+                                elif outcome.get('name') == away_team_name:
+                                    away_ml = outcome.get('price')
+
+                    # Use first bookmaker that has data
+                    if spread is not None or total is not None:
+                        break
+
+                # Update game with odds
+                if spread is not None:
+                    game.spread = spread
+                if total is not None:
+                    game.total = total
+                if home_ml is not None:
+                    game.home_moneyline = home_ml
+                if away_ml is not None:
+                    game.away_moneyline = away_ml
+
+                if any([spread, total, home_ml, away_ml]):
+                    game.odds_updated_at = datetime.now()
+                    updated_count += 1
+                    logger.debug(
+                        f"Updated {away_team_name} @ {home_team_name}: "
+                        f"spread={spread}, total={total}"
+                    )
+
+            session.commit()
+            logger.info(f"Updated {updated_count} games with odds data")
+
+        return updated_count
+
     def get_player_props(
         self,
         markets: Optional[List[str]] = None,

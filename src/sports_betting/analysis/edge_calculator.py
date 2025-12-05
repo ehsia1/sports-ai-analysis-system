@@ -9,6 +9,7 @@ from ..database import get_session
 from ..database.models import Prop, Player, Game, Prediction, Edge
 from ..data.weather import get_weather_service, GameWeather
 from ..data.injuries import get_injury_service, InjuryStatus
+from ..data.matchup import get_matchup_service, MatchupContext
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ class EdgeCalculator:
         weather: Optional[str] = None,
         weather_warning: Optional[str] = None,
         injury_warning: Optional[str] = None,
+        matchup_summary: Optional[str] = None,
     ) -> Dict[str, str]:
         """
         Generate human-readable reasoning for an edge.
@@ -147,6 +149,10 @@ class EdgeCalculator:
             detailed_lines.append(f"🌨️ Weather: {weather_warning} (confidence adjusted)")
         elif weather and weather != "Dome" and "nan" not in str(weather).lower() and weather != "Outdoor":
             detailed_lines.append(f"🌤️ Weather: {weather}")
+
+        # Matchup context
+        if matchup_summary:
+            detailed_lines.append(f"📊 Matchup: {matchup_summary}")
 
         # Position context
         position_context = {
@@ -357,6 +363,10 @@ class EdgeCalculator:
         injury_service = get_injury_service()
         injury_service.fetch_all_espn_injuries()  # Pre-populate cache
 
+        # Get matchup service and pre-fetch week matchups
+        matchup_service = get_matchup_service()
+        week_matchups = matchup_service.get_week_matchups(season, week)
+
         with get_session() as session:
             # Get all games for this week
             games = session.query(Game).filter_by(
@@ -369,6 +379,9 @@ class EdgeCalculator:
                 # Get weather for this game
                 game_key = f"{game.away_team.abbreviation}@{game.home_team.abbreviation}"
                 weather = week_weather.get(game_key)
+
+                # Get matchup context for this game
+                matchup_context = week_matchups.get(game.id)
 
                 # Get props for this game (include props from last 48 hours)
                 cutoff_time = datetime.now() - timedelta(hours=48)
@@ -426,6 +439,19 @@ class EdgeCalculator:
                         if prop.market in ('player_pass_yds', 'player_reception_yds'):
                             adjusted_confidence *= weather.weather_impact
                             weather_warning = weather.summary
+
+                    # Apply matchup context adjustment to confidence
+                    # Higher implied totals boost passing/receiving, favorites may run more
+                    matchup_summary = None
+                    if matchup_context:
+                        player_team = session.query(Player).get(prop.player_id)
+                        if player_team and player_team.team:
+                            team_abbr = player_team.team.abbreviation
+                            matchup_multiplier = matchup_context.get_confidence_multiplier(
+                                team_abbr, prop.market
+                            )
+                            adjusted_confidence *= matchup_multiplier
+                            matchup_summary = matchup_context.summary
 
                     # Calculate edge
                     edge_analysis = self.calculate_edge(
@@ -486,6 +512,7 @@ class EdgeCalculator:
                             weather=weather.summary if weather else None,
                             weather_warning=weather_warning,
                             injury_warning=injury_warning,
+                            matchup_summary=matchup_summary,
                         )
 
                         edge_info = {
@@ -499,6 +526,10 @@ class EdgeCalculator:
                             'weather_warning': weather_warning,
                             'injury_warning': injury_warning,
                             'injury_status': injury_status.status if injury_status else None,
+                            'matchup_summary': matchup_summary,
+                            'implied_team_total': matchup_context.get_team_implied_total(
+                                player.team.abbreviation
+                            ) if matchup_context and player.team else None,
                             'reasoning': reasoning['short'],
                             'reasoning_detailed': reasoning['detailed'],
                             **edge_analysis,
@@ -786,4 +817,6 @@ class EdgeCalculator:
             'weather_warning': edge.get('weather_warning'),
             'injury_warning': edge.get('injury_warning'),
             'injury_status': edge.get('injury_status'),
+            'matchup_summary': edge.get('matchup_summary'),
+            'implied_team_total': edge.get('implied_team_total'),
         }

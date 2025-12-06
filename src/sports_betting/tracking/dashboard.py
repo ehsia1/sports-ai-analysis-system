@@ -335,8 +335,10 @@ class ResultDashboard:
         ))
 
         # By confidence bucket
+        # Note: This is data quality confidence (how much historical data available),
+        # NOT prediction accuracy confidence
         lines.append(self.format_breakdown_table(
-            data.by_confidence_bucket, "BY MODEL CONFIDENCE", sort_by='bets'
+            data.by_confidence_bucket, "BY MODEL CONFIDENCE (Data Quality)", sort_by='bets'
         ))
 
         # By week (if showing all weeks)
@@ -429,20 +431,49 @@ class ResultDashboard:
                     )
 
         # Confidence insight
+        # Note: model_confidence is based on DATA QUALITY (historical data availability),
+        # NOT prediction accuracy. It indicates how much data the model had to work with.
         if data.by_confidence_bucket:
             high_conf = data.by_confidence_bucket.get('High (80%+)')
+            low_conf = data.by_confidence_bucket.get('Low (<60%)')
+
             if high_conf and high_conf.total_bets >= 3:
                 if high_conf.win_rate > 50:
                     insights.append(
-                        f"High confidence bets performing well: {high_conf.win_rate:.0f}% win rate"
+                        f"High data-quality bets performing well: {high_conf.win_rate:.0f}% win rate"
                     )
-                elif high_conf.win_rate < 35:
-                    insights.append(
-                        f"⚠️ High confidence bets underperforming: {high_conf.win_rate:.0f}% - model may be overconfident"
-                    )
+                elif high_conf.win_rate < 40:
+                    # Check if low confidence is outperforming - indicates tighter lines on known players
+                    low_wr = low_conf.win_rate if low_conf and low_conf.total_bets >= 3 else 0
+                    if low_wr > high_conf.win_rate + 10:
+                        insights.append(
+                            f"⚠️ High data-quality bets ({high_conf.win_rate:.0f}%) beaten by low ({low_wr:.0f}%) - "
+                            f"well-known players may have tighter lines"
+                        )
+                    else:
+                        insights.append(
+                            f"⚠️ High data-quality bets underperforming: {high_conf.win_rate:.0f}%"
+                        )
 
         if not insights:
             insights.append("Insufficient data for meaningful insights yet.")
+
+        # Add backtest context when paper trade results differ significantly from historical
+        if data.by_direction:
+            over = data.by_direction.get('OVER')
+            under = data.by_direction.get('UNDER')
+            # Historical backtest shows UNDERs hit 73%, OVERs hit 54%
+            # If current results show opposite, flag it
+            if under and under.total_bets >= 5 and under.win_rate < 40:
+                insights.append(
+                    "📊 Note: Historical backtest (2600 bets) shows UNDERs at 73% win rate. "
+                    "Current underperformance may be sample variance."
+                )
+            elif over and over.total_bets >= 5 and over.win_rate > 60:
+                insights.append(
+                    "📊 Note: Historical backtest (2600 bets) shows OVERs at 54% win rate. "
+                    "Current overperformance may regress to mean."
+                )
 
         return insights
 

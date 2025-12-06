@@ -659,7 +659,8 @@ def cmd_filters(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
     if args.generate:
         print()
         print("=" * 70)
-        print(f"GENERATING DYNAMIC FILTERS - {season} Season")
+        source = "BACKTEST CSV (2600+ samples)" if args.use_backtest else "PAPER TRADES"
+        print(f"GENERATING DYNAMIC FILTERS - {season} Season ({source})")
         print("=" * 70)
         print()
 
@@ -670,6 +671,7 @@ def cmd_filters(orchestrator: Orchestrator, args: argparse.Namespace) -> int:
             season=season,
             min_week=min_week,
             max_week=max_week,
+            use_backtest=args.use_backtest,
         )
 
         if rules:
@@ -1101,6 +1103,11 @@ Examples:
         "--max-week",
         type=int,
         help="Only include trades up to this week",
+    )
+    filters.add_argument(
+        "--use-backtest",
+        action="store_true",
+        help="Use backtest CSV (2600+ samples) instead of paper trades",
     )
 
     # Parlay command

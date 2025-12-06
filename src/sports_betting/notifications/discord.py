@@ -208,10 +208,35 @@ class DiscordNotifier:
         fields = [
             {"name": "Edge", "value": f"{alert.edge_pct:+.1f}%", "inline": True},
             {"name": "EV", "value": f"{alert.ev_pct:+.1f}%", "inline": True} if alert.ev_pct else None,
-            {"name": "Confidence", "value": f"{alert.confidence:.0%}", "inline": True},
+            {"name": "Data Quality", "value": f"{alert.confidence:.0%}", "inline": True},
         ]
         # Filter out None fields
         fields = [f for f in fields if f is not None]
+
+        # Add backtest context warnings
+        warnings = []
+
+        # Historical direction performance (from 2600-bet backtest)
+        # UNDERs hit 73% historically, OVERs hit 54%
+        if alert.direction == "over":
+            warnings.append("OVERs hit 54% historically (use caution)")
+        # Note: UNDERs don't get a warning - they're the profitable side
+
+        # High data-quality warning (well-known players have tighter lines)
+        if alert.confidence >= 0.85:
+            warnings.append("High data-quality = tighter lines")
+
+        # Low edge warning
+        if alert.edge_pct < 5:
+            warnings.append("Low edge - close to breakeven")
+
+        # Add warning field if any
+        if warnings:
+            fields.append({
+                "name": "⚠️ Context",
+                "value": " | ".join(warnings),
+                "inline": False,
+            })
 
         # Add weather warning if present
         if alert.weather_warning:
@@ -586,8 +611,9 @@ def send_parlay_notification(parlay: Any) -> bool:
     for leg in parlay.legs:
         direction_emoji = "📈" if leg.side == "over" else "📉"
         market_short = leg.market.replace("player_", "").replace("_yds", "").replace("_", " ").title()
+        pos_str = f" [{leg.position}]" if hasattr(leg, "position") and leg.position else ""
         legs_description.append(
-            f"{direction_emoji} **{leg.player}** {leg.side.upper()} {leg.line} {market_short}\n"
+            f"{direction_emoji} **{leg.player}**{pos_str} {leg.side.upper()} {leg.line} {market_short}\n"
             f"   └ {leg.game} | Leg EV: {leg.ev_pct:+.1f}%"
         )
 
@@ -605,6 +631,28 @@ def send_parlay_notification(parlay: Any) -> bool:
         {"name": "Expected Value", "value": f"+{ev_pct:.1f}%", "inline": True},
         {"name": "Type", "value": parlay.parlay_type.replace("_", " ").title(), "inline": True},
     ]
+
+    # Add correlation info for same-game parlays
+    has_correlation = getattr(parlay, "has_significant_correlation", False)
+    correlation_adjustment = getattr(parlay, "correlation_adjustment", 0)
+    correlation_warnings = getattr(parlay, "correlation_warnings", [])
+
+    if has_correlation:
+        direction = "↓" if correlation_adjustment < 0 else "↑"
+        fields.append({
+            "name": "📊 Correlation Impact",
+            "value": f"Probability adjusted {direction}{abs(correlation_adjustment):.0%}",
+            "inline": True,
+        })
+
+    # Add correlation warnings if present
+    if correlation_warnings:
+        warnings_text = "\n".join(f"• {w}" for w in correlation_warnings[:3])
+        fields.append({
+            "name": "⚠️ SGP Correlations",
+            "value": warnings_text,
+            "inline": False,
+        })
 
     footer = f"NFL Parlay Bot | {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 

@@ -1,13 +1,15 @@
 """Parlay generation from top betting edges.
 
-Generates optimal parlay combinations from uncorrelated edges,
-calculating combined odds and expected value.
+Generates optimal parlay combinations from edges,
+calculating combined odds and expected value with
+same-game parlay correlation adjustments.
 """
 
 import logging
+import math
 from itertools import combinations
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from ..database import get_session
@@ -30,17 +32,51 @@ class ParlayLeg:
     edge_pct: float
     ev_pct: float
     odds: int  # American odds
+    position: str = ""  # Position (QB, RB, WR, TE)
+
+
+# Correlation coefficients for same-game parlays
+# Based on empirical NFL data - positive = outcomes move together
+# These adjust joint probability: higher correlation = less independence
+SGP_CORRELATIONS = {
+    # Same team passing connection (QB + receiver)
+    # If QB throws more, WR/TE get more yards - strong positive correlation
+    ("QB", "WR", "same_team"): 0.45,
+    ("QB", "TE", "same_team"): 0.40,
+
+    # Same team, same position group - competition for touches
+    # If RB1 gets more carries, RB2 gets fewer - negative correlation
+    ("RB", "RB", "same_team"): -0.25,
+    ("WR", "WR", "same_team"): -0.15,
+    ("WR", "TE", "same_team"): -0.10,
+
+    # Same team, different roles - weak positive (game script)
+    ("RB", "WR", "same_team"): 0.10,
+    ("RB", "TE", "same_team"): 0.10,
+
+    # Opposite teams - game script effects
+    # If one team dominates, other team plays from behind
+    ("QB", "QB", "opposite_team"): 0.15,  # Both QBs can have good games in shootout
+    ("RB", "RB", "opposite_team"): -0.10,  # Winning team runs more
+    ("WR", "WR", "opposite_team"): 0.10,
+    ("QB", "WR", "opposite_team"): 0.05,
+    ("QB", "RB", "opposite_team"): -0.05,
+}
 
 
 @dataclass
 class ParlayCombo:
     """A parlay combination."""
     legs: List[ParlayLeg]
-    joint_probability: float  # Combined probability (assuming independence)
+    joint_probability: float  # Combined probability (adjusted for correlation)
     fair_odds: int  # What odds should be based on probability
     implied_odds: int  # Combined book odds
     expected_value: float  # EV as decimal (0.15 = 15%)
     parlay_type: str  # "cross_game" or "same_game"
+    # Correlation tracking
+    independent_probability: float = 0.0  # Probability if legs were independent
+    correlation_adjustment: float = 0.0  # How much correlation changed probability
+    correlation_warnings: List[str] = field(default_factory=list)
 
     @property
     def leg_count(self) -> int:
@@ -50,13 +86,22 @@ class ParlayCombo:
     def ev_pct(self) -> float:
         return self.expected_value * 100
 
+    @property
+    def has_significant_correlation(self) -> bool:
+        """Returns True if correlation adjustment is significant (>5%)."""
+        return abs(self.correlation_adjustment) > 0.05
+
     def summary(self) -> str:
         """One-line summary of the parlay."""
         legs_str = " + ".join([
             f"{leg.player} {leg.side.upper()} {leg.line}"
             for leg in self.legs
         ])
-        return f"{self.leg_count}-leg: {legs_str} | EV: {self.ev_pct:+.1f}%"
+        corr_note = ""
+        if self.has_significant_correlation:
+            direction = "↑" if self.correlation_adjustment > 0 else "↓"
+            corr_note = f" | Corr: {direction}{abs(self.correlation_adjustment):.0%}"
+        return f"{self.leg_count}-leg: {legs_str} | EV: {self.ev_pct:+.1f}%{corr_note}"
 
 
 class ParlayGenerator:
@@ -85,6 +130,113 @@ class ParlayGenerator:
 
         if max_legs > self.MAX_LEGS_CAP:
             logger.warning(f"max_legs capped at {self.MAX_LEGS_CAP} (requested {max_legs})")
+
+    def _infer_position_from_market(self, market: str) -> str:
+        """Infer player position from market type."""
+        market_lower = market.lower()
+        if "pass" in market_lower:
+            return "QB"
+        elif "rush" in market_lower:
+            return "RB"  # Could be QB too, but RB is most common
+        elif "reception" in market_lower or "receiving" in market_lower:
+            return "WR"  # Could be TE/RB, but WR most common
+        return ""
+
+    def get_correlation_coefficient(
+        self, leg1: ParlayLeg, leg2: ParlayLeg
+    ) -> Tuple[float, str]:
+        """
+        Calculate correlation coefficient between two legs.
+
+        Returns:
+            Tuple of (correlation_coefficient, description)
+            - Positive: outcomes tend to move together
+            - Negative: outcomes tend to move opposite
+            - Zero: independent
+        """
+        # Different games = no correlation (independent)
+        if leg1.game != leg2.game:
+            return 0.0, "cross_game"
+
+        # Same game - determine relationship
+        pos1 = leg1.position.upper() if leg1.position else "UNK"
+        pos2 = leg2.position.upper() if leg2.position else "UNK"
+        same_team = leg1.team == leg2.team
+
+        team_type = "same_team" if same_team else "opposite_team"
+
+        # Look up correlation coefficient
+        # Try both orderings since dict may only have one
+        key1 = (pos1, pos2, team_type)
+        key2 = (pos2, pos1, team_type)
+
+        if key1 in SGP_CORRELATIONS:
+            corr = SGP_CORRELATIONS[key1]
+        elif key2 in SGP_CORRELATIONS:
+            corr = SGP_CORRELATIONS[key2]
+        else:
+            # Default: small positive correlation for same game
+            corr = 0.05 if same_team else 0.02
+
+        # Adjust correlation based on bet direction
+        # If betting same direction (both OVER or both UNDER), correlation stays same
+        # If betting opposite directions, flip the sign
+        if leg1.side != leg2.side:
+            corr = -corr
+
+        description = f"{pos1}+{pos2} ({team_type.replace('_', ' ')})"
+        return corr, description
+
+    def _calculate_correlated_probability(
+        self, legs: List[ParlayLeg]
+    ) -> Tuple[float, float, List[str]]:
+        """
+        Calculate joint probability with correlation adjustment.
+
+        Uses a simplified copula-like adjustment:
+        - For positive correlations: reduce joint probability (harder to hit both)
+        - For negative correlations: increase joint probability (easier to hit both)
+
+        Returns:
+            Tuple of (adjusted_probability, independent_probability, warnings)
+        """
+        # Independent probability (naive multiplication)
+        independent_prob = 1.0
+        for leg in legs:
+            independent_prob *= leg.probability
+
+        # Calculate total correlation effect
+        # Sum pairwise correlations
+        total_corr = 0.0
+        warnings = []
+
+        for i, leg1 in enumerate(legs):
+            for leg2 in legs[i + 1:]:
+                corr, desc = self.get_correlation_coefficient(leg1, leg2)
+                if abs(corr) > 0.1:
+                    warnings.append(f"{leg1.player} ↔ {leg2.player}: {corr:+.2f} ({desc})")
+                total_corr += corr
+
+        # Apply correlation adjustment
+        # Positive correlation = lower probability of both hitting
+        # Negative correlation = higher probability of both hitting
+        # Scale factor based on average individual probability
+        avg_prob = independent_prob ** (1 / len(legs))
+
+        # Adjustment formula: multiply by (1 - corr * scale_factor)
+        # Scale factor decreases as leg count increases (correlations compound less)
+        scale_factor = 0.15 / math.sqrt(len(legs))
+        adjustment_factor = 1.0 - (total_corr * scale_factor)
+
+        # Clamp to reasonable range (0.5 to 1.5 of independent)
+        adjustment_factor = max(0.5, min(1.5, adjustment_factor))
+
+        adjusted_prob = independent_prob * adjustment_factor
+
+        # Ensure probability stays in valid range
+        adjusted_prob = max(0.001, min(0.999, adjusted_prob))
+
+        return adjusted_prob, independent_prob, warnings
 
     def edges_to_legs(self, edges: List[Dict], force_refresh: bool = False) -> List[ParlayLeg]:
         """Convert edge dicts to ParlayLeg objects.
@@ -124,6 +276,11 @@ class ParlayGenerator:
             if ev_pct / 100 < self.min_leg_ev:
                 continue
 
+            # Extract position from edge data or infer from market
+            position = edge.get("position", "")
+            if not position:
+                position = self._infer_position_from_market(edge.get("market", ""))
+
             leg = ParlayLeg(
                 player=edge.get("player", "Unknown"),
                 team=edge.get("team", ""),
@@ -136,6 +293,7 @@ class ParlayGenerator:
                 edge_pct=edge_pct,
                 ev_pct=ev_pct,
                 odds=odds,
+                position=position,
             )
             legs.append(leg)
 
@@ -184,17 +342,30 @@ class ParlayGenerator:
         # - Cross-game (standard parlay)
         return False
 
-    def calculate_parlay_odds(self, legs: List[ParlayLeg]) -> Tuple[float, int, int]:
+    def calculate_parlay_odds(
+        self, legs: List[ParlayLeg], apply_correlation: bool = True
+    ) -> Tuple[float, int, int, float, List[str]]:
         """
         Calculate combined probability and odds for a parlay.
 
+        Args:
+            legs: List of parlay legs
+            apply_correlation: Whether to apply same-game correlation adjustments
+
         Returns:
-            Tuple of (joint_probability, fair_odds, implied_book_odds)
+            Tuple of (joint_probability, fair_odds, implied_book_odds,
+                      independent_probability, correlation_warnings)
         """
-        # Joint probability (assuming independence)
-        joint_prob = 1.0
-        for leg in legs:
-            joint_prob *= leg.probability
+        # Calculate probability with correlation adjustment
+        if apply_correlation:
+            joint_prob, independent_prob, warnings = self._calculate_correlated_probability(legs)
+        else:
+            # Independent probability (assuming no correlation)
+            joint_prob = 1.0
+            for leg in legs:
+                joint_prob *= leg.probability
+            independent_prob = joint_prob
+            warnings = []
 
         # Fair odds based on true probability
         if joint_prob > 0:
@@ -209,7 +380,7 @@ class ParlayGenerator:
             implied_decimal *= self._american_to_decimal(leg.odds)
         implied_odds = self._decimal_to_american(implied_decimal)
 
-        return joint_prob, fair_odds, implied_odds
+        return joint_prob, fair_odds, implied_odds, independent_prob, warnings
 
     def _american_to_decimal(self, american: int) -> float:
         """Convert American odds to decimal."""
@@ -269,8 +440,14 @@ class ParlayGenerator:
             if has_correlation:
                 continue
 
-            # Calculate combined odds
-            joint_prob, fair_odds, implied_odds = self.calculate_parlay_odds(list(combo))
+            # Calculate combined odds with correlation adjustment
+            (
+                joint_prob, fair_odds, implied_odds,
+                independent_prob, corr_warnings
+            ) = self.calculate_parlay_odds(list(combo))
+
+            # Calculate correlation adjustment ratio
+            corr_adjustment = (joint_prob / independent_prob) - 1 if independent_prob > 0 else 0
 
             # Calculate EV
             # EV = (probability * payout) - 1
@@ -292,6 +469,9 @@ class ParlayGenerator:
                 implied_odds=implied_odds,
                 expected_value=ev,
                 parlay_type=parlay_type,
+                independent_probability=independent_prob,
+                correlation_adjustment=corr_adjustment,
+                correlation_warnings=corr_warnings,
             )
             parlays.append(parlay)
 
@@ -337,9 +517,14 @@ class ParlayGenerator:
             if is_correlated:
                 continue
 
-            # Create extended parlay
+            # Create extended parlay with correlation adjustment
             new_legs = list(parlay.legs) + [leg]
-            joint_prob, fair_odds, implied_odds = self.calculate_parlay_odds(new_legs)
+            (
+                joint_prob, fair_odds, implied_odds,
+                independent_prob, corr_warnings
+            ) = self.calculate_parlay_odds(new_legs)
+
+            corr_adjustment = (joint_prob / independent_prob) - 1 if independent_prob > 0 else 0
 
             implied_decimal = self._american_to_decimal(implied_odds)
             ev = (joint_prob * implied_decimal) - 1
@@ -357,6 +542,9 @@ class ParlayGenerator:
                 implied_odds=implied_odds,
                 expected_value=ev,
                 parlay_type=parlay_type,
+                independent_probability=independent_prob,
+                correlation_adjustment=corr_adjustment,
+                correlation_warnings=corr_warnings,
             ))
 
         return extensions
@@ -457,10 +645,32 @@ class ParlayGenerator:
             lines.append("")
 
             for i, parlay in enumerate(parlays, 1):
-                lines.append(f"#{i} | EV: {parlay.ev_pct:+.1f}% | Prob: {parlay.joint_probability:.1%} | Odds: {parlay.implied_odds:+d}")
+                # Show correlation adjustment if significant
+                corr_info = ""
+                if parlay.has_significant_correlation:
+                    direction = "↓" if parlay.correlation_adjustment < 0 else "↑"
+                    corr_info = f" | Corr: {direction}{abs(parlay.correlation_adjustment):.0%}"
+
+                lines.append(
+                    f"#{i} | EV: {parlay.ev_pct:+.1f}% | "
+                    f"Prob: {parlay.joint_probability:.1%} | "
+                    f"Odds: {parlay.implied_odds:+d}{corr_info}"
+                )
+
                 for leg in parlay.legs:
                     market_short = leg.market.replace("player_", "").replace("_yds", "").replace("_", " ")
-                    lines.append(f"   {leg.side.upper()} {leg.line} {market_short} - {leg.player} ({leg.game})")
+                    pos_info = f" [{leg.position}]" if leg.position else ""
+                    lines.append(
+                        f"   {leg.side.upper()} {leg.line} {market_short} - "
+                        f"{leg.player}{pos_info} ({leg.game})"
+                    )
+
+                # Show correlation warnings for same-game parlays
+                if parlay.correlation_warnings:
+                    lines.append("   ⚠️ Correlations:")
+                    for warning in parlay.correlation_warnings[:3]:  # Limit to top 3
+                        lines.append(f"      {warning}")
+
                 lines.append("")
 
         return "\n".join(lines)

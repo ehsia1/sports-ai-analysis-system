@@ -1,5 +1,17 @@
 # NFL Sports Betting System - Claude Code Guide
 
+## Current Season Context
+
+**Last Updated**: 2025-12-05
+
+| Field | Value |
+|-------|-------|
+| NFL Season | 2024-2025 (referred to as "2025 season") |
+| Current Week | Week 14 |
+| Season Status | Regular season in progress |
+
+> **Note**: Update this section when the week changes. The system uses `--season 2025` for current season data.
+
 ## Virtual Environment
 
 **IMPORTANT**: Always use the virtual environment for all Python commands.

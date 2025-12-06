@@ -201,18 +201,129 @@ class DynamicFilterService:
 
         return stats
 
+    def generate_rules_from_backtest(
+        self,
+        csv_path: Optional[Path] = None,
+        min_week: Optional[int] = None,
+        max_week: Optional[int] = None,
+    ) -> List[FilterRule]:
+        """
+        Generate filter rules from backtest CSV data.
+
+        This is more reliable than paper trades when sample size is limited.
+        The backtest CSV contains historical predictions with actual results.
+
+        Args:
+            csv_path: Path to backtest CSV (default: data/backtest_results_2024.csv)
+            min_week: Only include weeks >= this
+            max_week: Only include weeks <= this
+
+        Returns:
+            List of FilterRule objects
+        """
+        import pandas as pd
+
+        if csv_path is None:
+            # Default path relative to project root
+            csv_path = Path(__file__).parent.parent.parent.parent / "data" / "backtest_results_2024.csv"
+
+        if not csv_path.exists():
+            logger.warning(f"Backtest CSV not found at {csv_path}")
+            return []
+
+        df = pd.read_csv(csv_path)
+        logger.info(f"Loaded {len(df)} backtest results from {csv_path}")
+
+        # Apply week filters
+        if min_week:
+            df = df[df['week'] >= min_week]
+        if max_week:
+            df = df[df['week'] <= max_week]
+
+        # Add derived columns
+        df['direction'] = df['bet_side']
+        df['tier'] = df.apply(
+            lambda r: self._get_tier(r['player'], r['position']), axis=1
+        )
+        df['position_direction'] = df['position'] + '_' + df['direction']
+        df['tier_direction'] = df['tier'] + '_' + df['direction']
+
+        # Note: backtest CSV doesn't have 'market' column - all are receiving yards
+        # So we skip market-based dimensions for backtest
+
+        rules = []
+        backtest_dimensions = ['direction', 'position', 'position_direction', 'tier_direction']
+
+        for dim in backtest_dimensions:
+            for cat in df[dim].unique():
+                subset = df[df[dim] == cat]
+                wins = int(subset['hit'].sum())
+                total = len(subset)
+                profit = subset['profit'].sum()
+                wr = wins / total if total > 0 else 0
+
+                if total < self.config.min_sample_size:
+                    continue
+
+                # Check for skip conditions
+                if (wr < self.config.skip_below_win_rate or
+                    profit < self.config.skip_below_profit):
+                    rules.append(FilterRule(
+                        dimension=dim,
+                        category=cat,
+                        action='skip',
+                        win_rate=wr,
+                        sample_size=total,
+                        total_profit=profit,
+                        reason=f"Backtest: {wins}-{total-wins} ({wr:.0%}), ${profit:+,.0f}",
+                    ))
+
+                # Check for prioritize conditions
+                elif wr >= self.config.prioritize_above_win_rate:
+                    rules.append(FilterRule(
+                        dimension=dim,
+                        category=cat,
+                        action='prioritize',
+                        win_rate=wr,
+                        sample_size=total,
+                        total_profit=profit,
+                        reason=f"Backtest: {wins}-{total-wins} ({wr:.0%}), ${profit:+,.0f}",
+                    ))
+
+        # Sort by impact (skip rules first, then by sample size)
+        rules.sort(key=lambda r: (r.action != 'skip', -r.sample_size))
+
+        self._rules = rules
+        self._last_update = datetime.now()
+
+        logger.info(f"Generated {len(rules)} rules from backtest data")
+        return rules
+
     def generate_rules(
         self,
         season: int = 2024,
         min_week: Optional[int] = None,
         max_week: Optional[int] = None,
+        use_backtest: bool = False,
     ) -> List[FilterRule]:
         """
         Generate filter rules based on historical performance.
 
+        Args:
+            season: NFL season year
+            min_week: Only include weeks >= this
+            max_week: Only include weeks <= this
+            use_backtest: If True, use backtest CSV instead of paper trades
+
         Returns:
             List of FilterRule objects
         """
+        if use_backtest:
+            return self.generate_rules_from_backtest(
+                min_week=min_week,
+                max_week=max_week,
+            )
+
         stats = self.analyze_historical_performance(season, min_week, max_week)
         rules = []
 

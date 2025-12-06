@@ -1,14 +1,14 @@
 {
   "season": 2025,
   "week": 14,
-  "generated_at": "2025-12-04T02:02:37.205375",
+  "generated_at": "2025-12-05T21:43:39.535803",
   "stat_types": [
     "receiving_yards",
     "rushing_yards",
     "passing_yards",
     "receptions"
   ],
-  "total_predictions": 1680,
+  "total_predictions": 1681,
   "predictions": {
     "receiving_yards": [
       {
@@ -56,7 +56,7 @@
         "player_id": "pfr_George_Pickens",
         "position": "WR",
         "team": "DAL",
-        "predicted": 60.84701156616211,
+        "predicted": 63.69367218017578,
         "confidence": 0.75
       },
       {
@@ -76,18 +76,18 @@
         "confidence": 0.75
       },
       {
-        "player_name": "AJ Brown",
-        "player_id": "pfr_AJ_Brown",
-        "position": "WR",
-        "team": "PHI",
-        "predicted": 58.28778839111328,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Tetairoa McMillan",
         "player_id": "pfr_Tetairoa_McMillan",
         "position": "WR",
         "team": "CAR",
+        "predicted": 58.28778839111328,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "AJ Brown",
+        "player_id": "pfr_AJ_Brown",
+        "position": "WR",
+        "team": "PHI",
         "predicted": 58.28778839111328,
         "confidence": 0.75
       },
@@ -168,7 +168,7 @@
         "player_id": "pfr_CeeDee_Lamb",
         "position": "WR",
         "team": "DAL",
-        "predicted": 54.4437370300293,
+        "predicted": 54.41147232055664,
         "confidence": 0.75
       },
       {
@@ -177,14 +177,6 @@
         "position": "WR",
         "team": "LAC",
         "predicted": 54.40593719482422,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Amon-Ra St Brown",
-        "player_id": "pfr_Amon-Ra_St_Brown",
-        "position": "WR",
-        "team": "DET",
-        "predicted": 54.21367263793945,
         "confidence": 0.75
       },
       {
@@ -201,6 +193,14 @@
         "position": "WR",
         "team": "CHI",
         "predicted": 53.77044677734375,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Amon-Ra St Brown",
+        "player_id": "pfr_Amon-Ra_St_Brown",
+        "position": "WR",
+        "team": "DET",
+        "predicted": 53.145484924316406,
         "confidence": 0.75
       },
       {
@@ -412,6 +412,14 @@
         "confidence": 0.75
       },
       {
+        "player_name": "Jake Ferguson",
+        "player_id": "pfr_Jake_Ferguson",
+        "position": "TE",
+        "team": "DAL",
+        "predicted": 41.55742645263672,
+        "confidence": 0.75
+      },
+      {
         "player_name": "Zach Ertz",
         "player_id": "pfr_Zach_Ertz",
         "position": "TE",
@@ -425,14 +433,6 @@
         "position": "WR",
         "team": "WAS",
         "predicted": 40.88774490356445,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Jake Ferguson",
-        "player_id": "pfr_Jake_Ferguson",
-        "position": "TE",
-        "team": "DAL",
-        "predicted": 40.88291549682617,
         "confidence": 0.75
       },
       {
@@ -484,14 +484,6 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Jameson Williams",
-        "player_id": "pfr_Jameson_Williams",
-        "position": "WR",
-        "team": "DET",
-        "predicted": 39.94373321533203,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Juwan Johnson",
         "player_id": "pfr_Juwan_Johnson",
         "position": "TE",
@@ -505,6 +497,14 @@
         "position": "WR",
         "team": "IND",
         "predicted": 38.949195861816406,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Jameson Williams",
+        "player_id": "pfr_Jameson_Williams",
+        "position": "WR",
+        "team": "DET",
+        "predicted": 38.89211654663086,
         "confidence": 0.75
       },
       {
@@ -612,14 +612,6 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Sam LaPorta",
-        "player_id": "pfr_Sam_LaPorta",
-        "position": "TE",
-        "team": "DET",
-        "predicted": 34.734066009521484,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Sterling Shepard",
         "player_id": "pfr_Sterling_Shepard",
         "position": "WR",
@@ -689,6 +681,14 @@
         "position": "TE",
         "team": "TB",
         "predicted": 33.3258056640625,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Sam LaPorta",
+        "player_id": "pfr_Sam_LaPorta",
+        "position": "TE",
+        "team": "DET",
+        "predicted": 32.961097717285156,
         "confidence": 0.75
       },
       {
@@ -900,6 +900,14 @@
         "confidence": 0.6000000000000001
       },
       {
+        "player_name": "Jahmyr Gibbs",
+        "player_id": "pfr_Jahmyr_Gibbs",
+        "position": "RB",
+        "team": "DET",
+        "predicted": 27.19922637939453,
+        "confidence": 0.75
+      },
+      {
         "player_name": "Christian Kirk",
         "player_id": "pfr_Christian_Kirk",
         "position": "WR",
@@ -929,14 +937,6 @@
         "position": "TE",
         "team": "TEN",
         "predicted": 26.31287384033203,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Jahmyr Gibbs",
-        "player_id": "pfr_Jahmyr_Gibbs",
-        "position": "RB",
-        "team": "DET",
-        "predicted": 26.22490882873535,
         "confidence": 0.75
       },
       {
@@ -988,12 +988,12 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Tom Kennedy",
-        "player_id": "pfr_Tom_Kennedy",
+        "player_name": "Ryan Flournoy",
+        "player_id": "pfr_Ryan_Flournoy",
         "position": "WR",
-        "team": "DET",
-        "predicted": 25.6606502532959,
-        "confidence": 0.15000000000000002
+        "team": "DAL",
+        "predicted": 25.724576950073242,
+        "confidence": 0.75
       },
       {
         "player_name": "Josh Palmer",
@@ -1060,14 +1060,6 @@
         "confidence": 0.75
       },
       {
-        "player_name": "KaVontae Turpin",
-        "player_id": "pfr_KaVontae_Turpin",
-        "position": "WR",
-        "team": "DAL",
-        "predicted": 24.62350845336914,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Dyami Brown",
         "player_id": "pfr_Dyami_Brown",
         "position": "WR",
@@ -1080,6 +1072,14 @@
         "player_id": "pfr_JuJu_Smith-Schuster",
         "position": "WR",
         "team": "KC",
+        "predicted": 24.4011173248291,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "KaVontae Turpin",
+        "player_id": "pfr_KaVontae_Turpin",
+        "position": "WR",
+        "team": "DAL",
         "predicted": 24.4011173248291,
         "confidence": 0.75
       },
@@ -1180,12 +1180,12 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Ryan Flournoy",
-        "player_id": "pfr_Ryan_Flournoy",
+        "player_name": "Noah Brown",
+        "player_id": "pfr_Noah_Brown",
         "position": "WR",
-        "team": "DAL",
-        "predicted": 23.065948486328125,
-        "confidence": 0.75
+        "team": "WAS",
+        "predicted": 22.997873306274414,
+        "confidence": 0.30000000000000004
       },
       {
         "player_name": "Xavier Restrepo",
@@ -1204,14 +1204,6 @@
         "confidence": 0.44999999999999996
       },
       {
-        "player_name": "Noah Brown",
-        "player_id": "pfr_Noah_Brown",
-        "position": "WR",
-        "team": "WAS",
-        "predicted": 22.997873306274414,
-        "confidence": 0.30000000000000004
-      },
-      {
         "player_name": "Van Jefferson",
         "player_id": "pfr_Van_Jefferson",
         "position": "WR",
@@ -1220,18 +1212,18 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Greg Dortch",
-        "player_id": "pfr_Greg_Dortch",
-        "position": "WR",
-        "team": "ARI",
-        "predicted": 22.691049575805664,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Devaughn Vele",
         "player_id": "pfr_Devaughn_Vele",
         "position": "WR",
         "team": "NO",
+        "predicted": 22.691049575805664,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Greg Dortch",
+        "player_id": "pfr_Greg_Dortch",
+        "position": "WR",
+        "team": "ARI",
         "predicted": 22.691049575805664,
         "confidence": 0.75
       },
@@ -1284,20 +1276,20 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Gabriel Davis",
-        "player_id": "pfr_Gabriel_Davis",
-        "position": "WR",
-        "team": "BUF",
-        "predicted": 21.499664306640625,
-        "confidence": 0.44999999999999996
-      },
-      {
         "player_name": "Jayden Reed",
         "player_id": "pfr_Jayden_Reed",
         "position": "WR",
         "team": "GB",
         "predicted": 21.499664306640625,
         "confidence": 0.30000000000000004
+      },
+      {
+        "player_name": "Gabriel Davis",
+        "player_id": "pfr_Gabriel_Davis",
+        "position": "WR",
+        "team": "BUF",
+        "predicted": 21.499664306640625,
+        "confidence": 0.44999999999999996
       },
       {
         "player_name": "Chris Moore",
@@ -1329,14 +1321,6 @@
         "position": "TE",
         "team": "CIN",
         "predicted": 21.15505599975586,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Jalen Tolbert",
-        "player_id": "pfr_Jalen_Tolbert",
-        "position": "WR",
-        "team": "DAL",
-        "predicted": 21.05217933654785,
         "confidence": 0.75
       },
       {
@@ -1378,6 +1362,22 @@
         "team": "ARI",
         "predicted": 20.67372703552246,
         "confidence": 0.75
+      },
+      {
+        "player_name": "Jalen Tolbert",
+        "player_id": "pfr_Jalen_Tolbert",
+        "position": "WR",
+        "team": "DAL",
+        "predicted": 20.57196044921875,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Tom Kennedy",
+        "player_id": "pfr_Tom_Kennedy",
+        "position": "WR",
+        "team": "DET",
+        "predicted": 20.391233444213867,
+        "confidence": 0.30000000000000004
       },
       {
         "player_name": "Jared Wayne",
@@ -1516,14 +1516,6 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Kalif Raymond",
-        "player_id": "pfr_Kalif_Raymond",
-        "position": "WR",
-        "team": "DET",
-        "predicted": 19.4151554107666,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Donte Thornton",
         "player_id": "pfr_Donte_Thornton",
         "position": "WR",
@@ -1564,6 +1556,14 @@
         "confidence": 0.75
       },
       {
+        "player_name": "Kalif Raymond",
+        "player_id": "pfr_Kalif_Raymond",
+        "position": "WR",
+        "team": "DET",
+        "predicted": 18.519153594970703,
+        "confidence": 0.75
+      },
+      {
         "player_name": "Jonathan Taylor",
         "player_id": "pfr_Jonathan_Taylor",
         "position": "RB",
@@ -1584,14 +1584,6 @@
         "player_id": "pfr_Savion_Williams",
         "position": "WR",
         "team": "GB",
-        "predicted": 18.23938751220703,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Isaac TeSlaa",
-        "player_id": "pfr_Isaac_TeSlaa",
-        "position": "WR",
-        "team": "DET",
         "predicted": 18.23938751220703,
         "confidence": 0.75
       },
@@ -1652,18 +1644,18 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Mitchell Tinsley",
-        "player_id": "pfr_Mitchell_Tinsley",
-        "position": "WR",
-        "team": "CIN",
-        "predicted": 17.98978042602539,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Elijah Moore",
         "player_id": "pfr_Elijah_Moore",
         "position": "WR",
         "team": "BUF",
+        "predicted": 17.98978042602539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Mitchell Tinsley",
+        "player_id": "pfr_Mitchell_Tinsley",
+        "position": "WR",
+        "team": "CIN",
         "predicted": 17.98978042602539,
         "confidence": 0.75
       },
@@ -1724,18 +1716,10 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Jason Brownlee",
-        "player_id": "pfr_Jason_Brownlee",
+        "player_name": "Charlie Jones",
+        "player_id": "pfr_Charlie_Jones",
         "position": "WR",
-        "team": "KC",
-        "predicted": 17.57167625427246,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Tai Felton",
-        "player_id": "pfr_Tai_Felton",
-        "position": "WR",
-        "team": "MIN",
+        "team": "CIN",
         "predicted": 17.57167625427246,
         "confidence": 0.75
       },
@@ -1756,14 +1740,6 @@
         "confidence": 0.75
       },
       {
-        "player_name": "KeAndre Lambert-Smith",
-        "player_id": "pfr_KeAndre_Lambert-Smith",
-        "position": "WR",
-        "team": "LAC",
-        "predicted": 17.57167625427246,
-        "confidence": 0.75
-      },
-      {
         "player_name": "LilJordan Humphrey",
         "player_id": "pfr_LilJordan_Humphrey",
         "position": "WR",
@@ -1772,10 +1748,18 @@
         "confidence": 0.30000000000000004
       },
       {
-        "player_name": "Charlie Jones",
-        "player_id": "pfr_Charlie_Jones",
+        "player_name": "Jonathan Mingo",
+        "player_id": "pfr_Jonathan_Mingo",
         "position": "WR",
-        "team": "CIN",
+        "team": "DAL",
+        "predicted": 17.57167625427246,
+        "confidence": 0.30000000000000004
+      },
+      {
+        "player_name": "KeAndre Lambert-Smith",
+        "player_id": "pfr_KeAndre_Lambert-Smith",
+        "position": "WR",
+        "team": "LAC",
         "predicted": 17.57167625427246,
         "confidence": 0.75
       },
@@ -1788,10 +1772,18 @@
         "confidence": 0.44999999999999996
       },
       {
-        "player_name": "Anthony Gould",
-        "player_id": "pfr_Anthony_Gould",
+        "player_name": "Jason Brownlee",
+        "player_id": "pfr_Jason_Brownlee",
         "position": "WR",
-        "team": "IND",
+        "team": "KC",
+        "predicted": 17.57167625427246,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Tai Felton",
+        "player_id": "pfr_Tai_Felton",
+        "position": "WR",
+        "team": "MIN",
         "predicted": 17.57167625427246,
         "confidence": 0.75
       },
@@ -1808,6 +1800,14 @@
         "player_id": "pfr_Devin_Duvernay",
         "position": "WR",
         "team": "CHI",
+        "predicted": 17.57167625427246,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Anthony Gould",
+        "player_id": "pfr_Anthony_Gould",
+        "position": "WR",
+        "team": "IND",
         "predicted": 17.57167625427246,
         "confidence": 0.75
       },
@@ -1844,44 +1844,12 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Tay Martin",
-        "player_id": "pfr_Tay_Martin",
-        "position": "WR",
-        "team": "WAS",
-        "predicted": 17.328311920166016,
-        "confidence": 0.44999999999999996
-      },
-      {
-        "player_name": "Dareke Young",
-        "player_id": "pfr_Dareke_Young",
-        "position": "WR",
-        "team": "SEA",
-        "predicted": 17.328311920166016,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Michael Bandy",
-        "player_id": "pfr_Michael_Bandy",
-        "position": "WR",
-        "team": "DEN",
-        "predicted": 17.328311920166016,
-        "confidence": 0.30000000000000004
-      },
-      {
         "player_name": "Malik Heath",
         "player_id": "pfr_Malik_Heath",
         "position": "WR",
         "team": "GB",
         "predicted": 17.328311920166016,
         "confidence": 0.75
-      },
-      {
-        "player_name": "Tim Jones",
-        "player_id": "pfr_Tim_Jones",
-        "position": "WR",
-        "team": "JAX",
-        "predicted": 17.328311920166016,
-        "confidence": 0.30000000000000004
       },
       {
         "player_name": "Ashton Dulin",
@@ -1900,11 +1868,35 @@
         "confidence": 0.75
       },
       {
-        "player_name": "RJ Harvey",
-        "player_id": "pfr_RJ_Harvey",
-        "position": "RB",
+        "player_name": "Tay Martin",
+        "player_id": "pfr_Tay_Martin",
+        "position": "WR",
+        "team": "WAS",
+        "predicted": 17.328311920166016,
+        "confidence": 0.44999999999999996
+      },
+      {
+        "player_name": "Michael Bandy",
+        "player_id": "pfr_Michael_Bandy",
+        "position": "WR",
         "team": "DEN",
-        "predicted": 17.31460952758789,
+        "predicted": 17.328311920166016,
+        "confidence": 0.30000000000000004
+      },
+      {
+        "player_name": "Tim Jones",
+        "player_id": "pfr_Tim_Jones",
+        "position": "WR",
+        "team": "JAX",
+        "predicted": 17.328311920166016,
+        "confidence": 0.30000000000000004
+      },
+      {
+        "player_name": "Dareke Young",
+        "player_id": "pfr_Dareke_Young",
+        "position": "WR",
+        "team": "SEA",
+        "predicted": 17.328311920166016,
         "confidence": 0.75
       },
       {
@@ -1912,6 +1904,14 @@
         "player_id": "pfr_Rico_Dowdle",
         "position": "RB",
         "team": "CAR",
+        "predicted": 17.31460952758789,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "RJ Harvey",
+        "player_id": "pfr_RJ_Harvey",
+        "position": "RB",
+        "team": "DEN",
         "predicted": 17.31460952758789,
         "confidence": 0.75
       },
@@ -1948,20 +1948,20 @@
         "confidence": 0.75
       },
       {
-        "player_name": "David Moore",
-        "player_id": "pfr_David_Moore",
+        "player_name": "Skyy Moore",
+        "player_id": "pfr_Skyy_Moore",
         "position": "WR",
-        "team": "CAR",
+        "team": "SF",
         "predicted": 17.131175994873047,
-        "confidence": 0.6000000000000001
+        "confidence": 0.75
       },
       {
-        "player_name": "Andre Baccellia",
-        "player_id": "pfr_Andre_Baccellia",
+        "player_name": "Malachi Corley",
+        "player_id": "pfr_Malachi_Corley",
         "position": "WR",
-        "team": "ARI",
+        "team": "CLE",
         "predicted": 17.131175994873047,
-        "confidence": 0.44999999999999996
+        "confidence": 0.75
       },
       {
         "player_name": "Konata Mumpfield",
@@ -1972,20 +1972,44 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Ben Skowronek",
-        "player_id": "pfr_Ben_Skowronek",
+        "player_name": "DWayne Eskridge",
+        "player_id": "pfr_DWayne_Eskridge",
         "position": "WR",
-        "team": "PIT",
+        "team": "MIA",
         "predicted": 17.131175994873047,
         "confidence": 0.75
       },
       {
-        "player_name": "Dante Pettis",
-        "player_id": "pfr_Dante_Pettis",
+        "player_name": "Kameron Johnson",
+        "player_id": "pfr_Kameron_Johnson",
+        "position": "WR",
+        "team": "TB",
+        "predicted": 17.131175994873047,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Ryan Miller",
+        "player_id": "pfr_Ryan_Miller",
+        "position": "WR",
+        "team": "TB",
+        "predicted": 17.131175994873047,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Mason Tipton",
+        "player_id": "pfr_Mason_Tipton",
         "position": "WR",
         "team": "NO",
         "predicted": 17.131175994873047,
-        "confidence": 0.44999999999999996
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Trent Sherfield",
+        "player_id": "pfr_Trent_Sherfield",
+        "position": "WR",
+        "team": "DEN",
+        "predicted": 17.131175994873047,
+        "confidence": 0.75
       },
       {
         "player_name": "Alex Bachman",
@@ -1996,6 +2020,14 @@
         "confidence": 0.75
       },
       {
+        "player_name": "Andre Baccellia",
+        "player_id": "pfr_Andre_Baccellia",
+        "position": "WR",
+        "team": "ARI",
+        "predicted": 17.131175994873047,
+        "confidence": 0.44999999999999996
+      },
+      {
         "player_name": "Ray-Ray McCloud",
         "player_id": "pfr_Ray-Ray_McCloud",
         "position": "WR",
@@ -2004,26 +2036,10 @@
         "confidence": 0.30000000000000004
       },
       {
-        "player_name": "Nikko Remigio",
-        "player_id": "pfr_Nikko_Remigio",
-        "position": "WR",
-        "team": "KC",
-        "predicted": 17.131175994873047,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Cedrick Wilson",
         "player_id": "pfr_Cedrick_Wilson",
         "position": "WR",
         "team": "MIA",
-        "predicted": 17.131175994873047,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Ryan Miller",
-        "player_id": "pfr_Ryan_Miller",
-        "position": "WR",
-        "team": "TB",
         "predicted": 17.131175994873047,
         "confidence": 0.75
       },
@@ -2044,42 +2060,42 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Tahj Washington",
-        "player_id": "pfr_Tahj_Washington",
-        "position": "WR",
-        "team": "MIA",
-        "predicted": 17.131175994873047,
-        "confidence": 0.6000000000000001
-      },
-      {
-        "player_name": "John Metchie",
-        "player_id": "pfr_John_Metchie",
+        "player_name": "Xavier Gipson",
+        "player_id": "pfr_Xavier_Gipson",
         "position": "WR",
         "team": "PHI",
         "predicted": 17.131175994873047,
         "confidence": 0.75
       },
       {
-        "player_name": "Kameron Johnson",
-        "player_id": "pfr_Kameron_Johnson",
+        "player_name": "Ben Skowronek",
+        "player_id": "pfr_Ben_Skowronek",
         "position": "WR",
-        "team": "TB",
+        "team": "PIT",
         "predicted": 17.131175994873047,
         "confidence": 0.75
       },
       {
-        "player_name": "DWayne Eskridge",
-        "player_id": "pfr_DWayne_Eskridge",
+        "player_name": "David Moore",
+        "player_id": "pfr_David_Moore",
         "position": "WR",
-        "team": "MIA",
+        "team": "CAR",
         "predicted": 17.131175994873047,
-        "confidence": 0.75
+        "confidence": 0.6000000000000001
       },
       {
         "player_name": "Gunner Olszewski",
         "player_id": "pfr_Gunner_Olszewski",
         "position": "WR",
         "team": "NYG",
+        "predicted": 17.131175994873047,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "John Metchie",
+        "player_id": "pfr_John_Metchie",
+        "position": "WR",
+        "team": "PHI",
         "predicted": 17.131175994873047,
         "confidence": 0.75
       },
@@ -2092,38 +2108,6 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Bryce Oliver",
-        "player_id": "pfr_Bryce_Oliver",
-        "position": "WR",
-        "team": "TEN",
-        "predicted": 17.131175994873047,
-        "confidence": 0.30000000000000004
-      },
-      {
-        "player_name": "Skyy Moore",
-        "player_id": "pfr_Skyy_Moore",
-        "position": "WR",
-        "team": "SF",
-        "predicted": 17.131175994873047,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Trent Sherfield",
-        "player_id": "pfr_Trent_Sherfield",
-        "position": "WR",
-        "team": "DEN",
-        "predicted": 17.131175994873047,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Malachi Corley",
-        "player_id": "pfr_Malachi_Corley",
-        "position": "WR",
-        "team": "CLE",
-        "predicted": 17.131175994873047,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Mason Kinsey",
         "player_id": "pfr_Mason_Kinsey",
         "position": "WR",
@@ -2132,20 +2116,36 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Xavier Gipson",
-        "player_id": "pfr_Xavier_Gipson",
+        "player_name": "Tahj Washington",
+        "player_id": "pfr_Tahj_Washington",
         "position": "WR",
-        "team": "PHI",
+        "team": "MIA",
+        "predicted": 17.131175994873047,
+        "confidence": 0.6000000000000001
+      },
+      {
+        "player_name": "Nikko Remigio",
+        "player_id": "pfr_Nikko_Remigio",
+        "position": "WR",
+        "team": "KC",
         "predicted": 17.131175994873047,
         "confidence": 0.75
       },
       {
-        "player_name": "Mason Tipton",
-        "player_id": "pfr_Mason_Tipton",
+        "player_name": "Dante Pettis",
+        "player_id": "pfr_Dante_Pettis",
         "position": "WR",
         "team": "NO",
         "predicted": 17.131175994873047,
-        "confidence": 0.75
+        "confidence": 0.44999999999999996
+      },
+      {
+        "player_name": "Bryce Oliver",
+        "player_id": "pfr_Bryce_Oliver",
+        "position": "WR",
+        "team": "TEN",
+        "predicted": 17.131175994873047,
+        "confidence": 0.30000000000000004
       },
       {
         "player_name": "Justin Watson",
@@ -2228,10 +2228,10 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Jack Bech",
-        "player_id": "pfr_Jack_Bech",
+        "player_name": "Kyle Williams",
+        "player_id": "pfr_Kyle_Williams",
         "position": "WR",
-        "team": "LV",
+        "team": "NE",
         "predicted": 16.936246871948242,
         "confidence": 0.75
       },
@@ -2244,18 +2244,26 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Tim Patrick",
-        "player_id": "pfr_Tim_Patrick",
+        "player_name": "Jack Bech",
+        "player_id": "pfr_Jack_Bech",
         "position": "WR",
-        "team": "JAX",
+        "team": "LV",
         "predicted": 16.936246871948242,
         "confidence": 0.75
       },
       {
-        "player_name": "Kyle Williams",
-        "player_id": "pfr_Kyle_Williams",
+        "player_name": "Isaac TeSlaa",
+        "player_id": "pfr_Isaac_TeSlaa",
         "position": "WR",
-        "team": "NE",
+        "team": "DET",
+        "predicted": 16.936246871948242,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Tim Patrick",
+        "player_id": "pfr_Tim_Patrick",
+        "position": "WR",
+        "team": "JAX",
         "predicted": 16.936246871948242,
         "confidence": 0.75
       },
@@ -2444,12 +2452,12 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Dylan Drummond",
-        "player_id": "pfr_Dylan_Drummond",
+        "player_name": "Gage Larvadain",
+        "player_id": "pfr_Gage_Larvadain",
         "position": "WR",
-        "team": "ATL",
+        "team": "CLE",
         "predicted": 15.740910530090332,
-        "confidence": 0.6000000000000001
+        "confidence": 0.75
       },
       {
         "player_name": "Xavier Weaver",
@@ -2460,12 +2468,12 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Gage Larvadain",
-        "player_id": "pfr_Gage_Larvadain",
+        "player_name": "Dylan Drummond",
+        "player_id": "pfr_Dylan_Drummond",
         "position": "WR",
-        "team": "CLE",
+        "team": "ATL",
         "predicted": 15.740910530090332,
-        "confidence": 0.75
+        "confidence": 0.6000000000000001
       },
       {
         "player_name": "Zonovan Knight",
@@ -2473,14 +2481,6 @@
         "position": "RB",
         "team": "ARI",
         "predicted": 15.722290992736816,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Javonte Williams",
-        "player_id": "pfr_Javonte_Williams",
-        "position": "RB",
-        "team": "DAL",
-        "predicted": 15.569489479064941,
         "confidence": 0.75
       },
       {
@@ -2498,6 +2498,14 @@
         "team": "ARI",
         "predicted": 15.380414009094238,
         "confidence": 0.6000000000000001
+      },
+      {
+        "player_name": "Javonte Williams",
+        "player_id": "pfr_Javonte_Williams",
+        "position": "RB",
+        "team": "DAL",
+        "predicted": 15.324892044067383,
+        "confidence": 0.75
       },
       {
         "player_name": "Elijah Higgins",
@@ -2580,19 +2588,19 @@
         "confidence": 0.75
       },
       {
+        "player_name": "David Montgomery",
+        "player_id": "pfr_David_Montgomery",
+        "position": "RB",
+        "team": "DET",
+        "predicted": 14.140582084655762,
+        "confidence": 0.75
+      },
+      {
         "player_name": "Jeremy McNichols",
         "player_id": "pfr_Jeremy_McNichols",
         "position": "RB",
         "team": "WAS",
         "predicted": 14.140582084655762,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "David Montgomery",
-        "player_id": "pfr_David_Montgomery",
-        "position": "RB",
-        "team": "DET",
-        "predicted": 14.03354549407959,
         "confidence": 0.75
       },
       {
@@ -2684,18 +2692,18 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Jackson Hawes",
-        "player_id": "pfr_Jackson_Hawes",
-        "position": "TE",
-        "team": "BUF",
-        "predicted": 13.214339256286621,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Tanner Hudson",
         "player_id": "pfr_Tanner_Hudson",
         "position": "TE",
         "team": "CIN",
+        "predicted": 13.214339256286621,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Jackson Hawes",
+        "player_id": "pfr_Jackson_Hawes",
+        "position": "TE",
+        "team": "BUF",
         "predicted": 13.214339256286621,
         "confidence": 0.75
       },
@@ -2708,18 +2716,18 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Luke Schoonmaker",
-        "player_id": "pfr_Luke_Schoonmaker",
-        "position": "TE",
-        "team": "DAL",
-        "predicted": 13.147475242614746,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Luke Farrell",
         "player_id": "pfr_Luke_Farrell",
         "position": "TE",
         "team": "SF",
+        "predicted": 13.147475242614746,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Luke Schoonmaker",
+        "player_id": "pfr_Luke_Schoonmaker",
+        "position": "TE",
+        "team": "DAL",
         "predicted": 13.147475242614746,
         "confidence": 0.75
       },
@@ -2820,14 +2828,6 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Jacory Croskey-Merritt",
-        "player_id": "pfr_Jacory_Croskey-Merritt",
-        "position": "RB",
-        "team": "WAS",
-        "predicted": 12.408832550048828,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Chris Brooks",
         "player_id": "pfr_Chris_Brooks",
         "position": "RB",
@@ -2844,18 +2844,26 @@
         "confidence": 0.75
       },
       {
-        "player_name": "JK Dobbins",
-        "player_id": "pfr_JK_Dobbins",
-        "position": "RB",
-        "team": "DEN",
-        "predicted": 12.408832550048828,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Bhayshul Tuten",
         "player_id": "pfr_Bhayshul_Tuten",
         "position": "RB",
         "team": "JAX",
+        "predicted": 12.408832550048828,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Jacory Croskey-Merritt",
+        "player_id": "pfr_Jacory_Croskey-Merritt",
+        "position": "RB",
+        "team": "WAS",
+        "predicted": 12.408832550048828,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "JK Dobbins",
+        "player_id": "pfr_JK_Dobbins",
+        "position": "RB",
+        "team": "DEN",
         "predicted": 12.408832550048828,
         "confidence": 0.75
       },
@@ -2876,20 +2884,20 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Tip Reiman",
-        "player_id": "pfr_Tip_Reiman",
-        "position": "TE",
-        "team": "ARI",
-        "predicted": 12.30693244934082,
-        "confidence": 0.6000000000000001
-      },
-      {
         "player_name": "Lucas Krull",
         "player_id": "pfr_Lucas_Krull",
         "position": "TE",
         "team": "DEN",
         "predicted": 12.30693244934082,
         "confidence": 0.44999999999999996
+      },
+      {
+        "player_name": "Tip Reiman",
+        "player_id": "pfr_Tip_Reiman",
+        "position": "TE",
+        "team": "ARI",
+        "predicted": 12.30693244934082,
+        "confidence": 0.6000000000000001
       },
       {
         "player_name": "Jared Wiley",
@@ -2924,18 +2932,18 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Hassan Haskins",
-        "player_id": "pfr_Hassan_Haskins",
-        "position": "RB",
-        "team": "LAC",
-        "predicted": 12.270176887512207,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Ollie Gordon",
         "player_id": "pfr_Ollie_Gordon",
         "position": "RB",
         "team": "MIA",
+        "predicted": 12.270176887512207,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Hassan Haskins",
+        "player_id": "pfr_Hassan_Haskins",
+        "position": "RB",
+        "team": "LAC",
         "predicted": 12.270176887512207,
         "confidence": 0.75
       },
@@ -2956,18 +2964,18 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Tyler Allgeier",
-        "player_id": "pfr_Tyler_Allgeier",
-        "position": "RB",
-        "team": "ATL",
-        "predicted": 12.142671585083008,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Zach Charbonnet",
         "player_id": "pfr_Zach_Charbonnet",
         "position": "RB",
         "team": "SEA",
+        "predicted": 12.142671585083008,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Tyler Allgeier",
+        "player_id": "pfr_Tyler_Allgeier",
+        "position": "RB",
+        "team": "ATL",
         "predicted": 12.142671585083008,
         "confidence": 0.75
       },
@@ -2985,14 +2993,6 @@
         "position": "RB",
         "team": "DAL",
         "predicted": 11.96780776977539,
-        "confidence": 0.6000000000000001
-      },
-      {
-        "player_name": "James Mitchell",
-        "player_id": "pfr_James_Mitchell",
-        "position": "TE",
-        "team": "CAR",
-        "predicted": 11.8543119430542,
         "confidence": 0.6000000000000001
       },
       {
@@ -3020,12 +3020,28 @@
         "confidence": 0.75
       },
       {
+        "player_name": "James Mitchell",
+        "player_id": "pfr_James_Mitchell",
+        "position": "TE",
+        "team": "CAR",
+        "predicted": 11.8543119430542,
+        "confidence": 0.6000000000000001
+      },
+      {
         "player_name": "Grant Calcaterra",
         "player_id": "pfr_Grant_Calcaterra",
         "position": "TE",
         "team": "PHI",
         "predicted": 11.82384204864502,
         "confidence": 0.75
+      },
+      {
+        "player_name": "Anthony Firkser",
+        "player_id": "pfr_Anthony_Firkser",
+        "position": "TE",
+        "team": "DET",
+        "predicted": 11.82384204864502,
+        "confidence": 0.44999999999999996
       },
       {
         "player_name": "Mo Alie-Cox",
@@ -3052,6 +3068,38 @@
         "confidence": 0.75
       },
       {
+        "player_name": "Keleki Latu",
+        "player_id": "pfr_Keleki_Latu",
+        "position": "TE",
+        "team": "BUF",
+        "predicted": 11.69583511352539,
+        "confidence": 0.44999999999999996
+      },
+      {
+        "player_name": "Robert Tonyan",
+        "player_id": "pfr_Robert_Tonyan",
+        "position": "TE",
+        "team": "KC",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Nick Kallerup",
+        "player_id": "pfr_Nick_Kallerup",
+        "position": "TE",
+        "team": "SEA",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Ben Yurosek",
+        "player_id": "pfr_Ben_Yurosek",
+        "position": "TE",
+        "team": "MIN",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
         "player_name": "Payne Durham",
         "player_id": "pfr_Payne_Durham",
         "position": "TE",
@@ -3068,74 +3116,10 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Ben Yurosek",
-        "player_id": "pfr_Ben_Yurosek",
-        "position": "TE",
-        "team": "MIN",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Nick Kallerup",
-        "player_id": "pfr_Nick_Kallerup",
-        "position": "TE",
-        "team": "SEA",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Ross Dwelley",
-        "player_id": "pfr_Ross_Dwelley",
-        "position": "TE",
-        "team": "DET",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Anthony Firkser",
-        "player_id": "pfr_Anthony_Firkser",
-        "position": "TE",
-        "team": "DET",
-        "predicted": 11.69583511352539,
-        "confidence": 0.30000000000000004
-      },
-      {
-        "player_name": "Cam Grandy",
-        "player_id": "pfr_Cam_Grandy",
-        "position": "TE",
-        "team": "CIN",
-        "predicted": 11.69583511352539,
-        "confidence": 0.44999999999999996
-      },
-      {
         "player_name": "Eric Saubert",
         "player_id": "pfr_Eric_Saubert",
         "position": "TE",
         "team": "SEA",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Keleki Latu",
-        "player_id": "pfr_Keleki_Latu",
-        "position": "TE",
-        "team": "BUF",
-        "predicted": 11.69583511352539,
-        "confidence": 0.44999999999999996
-      },
-      {
-        "player_name": "Chris Manhertz",
-        "player_id": "pfr_Chris_Manhertz",
-        "position": "TE",
-        "team": "NYG",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "David Martin-Robinson",
-        "player_id": "pfr_David_Martin-Robinson",
-        "position": "TE",
-        "team": "TEN",
         "predicted": 11.69583511352539,
         "confidence": 0.75
       },
@@ -3148,10 +3132,26 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Robert Tonyan",
-        "player_id": "pfr_Robert_Tonyan",
+        "player_name": "Cam Grandy",
+        "player_id": "pfr_Cam_Grandy",
         "position": "TE",
-        "team": "KC",
+        "team": "CIN",
+        "predicted": 11.69583511352539,
+        "confidence": 0.44999999999999996
+      },
+      {
+        "player_name": "David Martin-Robinson",
+        "player_id": "pfr_David_Martin-Robinson",
+        "position": "TE",
+        "team": "TEN",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Chris Manhertz",
+        "player_id": "pfr_Chris_Manhertz",
+        "position": "TE",
+        "team": "NYG",
         "predicted": 11.69583511352539,
         "confidence": 0.75
       },
@@ -3160,126 +3160,6 @@
         "player_id": "pfr_Taysom_Hill",
         "position": "TE",
         "team": "NO",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Brayden Willis",
-        "player_id": "pfr_Brayden_Willis",
-        "position": "TE",
-        "team": "SF",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Quintin Morris",
-        "player_id": "pfr_Quintin_Morris",
-        "position": "TE",
-        "team": "JAX",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "John FitzPatrick",
-        "player_id": "pfr_John_FitzPatrick",
-        "position": "TE",
-        "team": "GB",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Harrison Bryant",
-        "player_id": "pfr_Harrison_Bryant",
-        "position": "TE",
-        "team": "HOU",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Zaire Mitchell-Paden",
-        "player_id": "pfr_Zaire_Mitchell-Paden",
-        "position": "TE",
-        "team": "BAL",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Ben Sinnott",
-        "player_id": "pfr_Ben_Sinnott",
-        "position": "TE",
-        "team": "WAS",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Andrew Ogletree",
-        "player_id": "pfr_Andrew_Ogletree",
-        "position": "TE",
-        "team": "IND",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Connor Heyward",
-        "player_id": "pfr_Connor_Heyward",
-        "position": "TE",
-        "team": "PIT",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Kylen Granson",
-        "player_id": "pfr_Kylen_Granson",
-        "position": "TE",
-        "team": "PHI",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Durham Smythe",
-        "player_id": "pfr_Durham_Smythe",
-        "position": "TE",
-        "team": "CHI",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Jack Stoll",
-        "player_id": "pfr_Jack_Stoll",
-        "position": "TE",
-        "team": "NO",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Blake Whiteheart",
-        "player_id": "pfr_Blake_Whiteheart",
-        "position": "TE",
-        "team": "CLE",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Josh Whyle",
-        "player_id": "pfr_Josh_Whyle",
-        "position": "TE",
-        "team": "GB",
-        "predicted": 11.69583511352539,
-        "confidence": 0.6000000000000001
-      },
-      {
-        "player_name": "Brevyn Spann-Ford",
-        "player_id": "pfr_Brevyn_Spann-Ford",
-        "position": "TE",
-        "team": "DAL",
-        "predicted": 11.69583511352539,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Charlie Woerner",
-        "player_id": "pfr_Charlie_Woerner",
-        "position": "TE",
-        "team": "ATL",
         "predicted": 11.69583511352539,
         "confidence": 0.75
       },
@@ -3295,7 +3175,79 @@
         "player_name": "Zaire Mitchell-Paden",
         "player_id": "pfr_Zaire_Mitchell-Paden",
         "position": "TE",
-        "team": "2TM",
+        "team": "BAL",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Connor Heyward",
+        "player_id": "pfr_Connor_Heyward",
+        "position": "TE",
+        "team": "PIT",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Charlie Woerner",
+        "player_id": "pfr_Charlie_Woerner",
+        "position": "TE",
+        "team": "ATL",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Jack Stoll",
+        "player_id": "pfr_Jack_Stoll",
+        "position": "TE",
+        "team": "NO",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Kylen Granson",
+        "player_id": "pfr_Kylen_Granson",
+        "position": "TE",
+        "team": "PHI",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Andrew Ogletree",
+        "player_id": "pfr_Andrew_Ogletree",
+        "position": "TE",
+        "team": "IND",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Ben Sinnott",
+        "player_id": "pfr_Ben_Sinnott",
+        "position": "TE",
+        "team": "WAS",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Brevyn Spann-Ford",
+        "player_id": "pfr_Brevyn_Spann-Ford",
+        "position": "TE",
+        "team": "DAL",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Harrison Bryant",
+        "player_id": "pfr_Harrison_Bryant",
+        "position": "TE",
+        "team": "HOU",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Ross Dwelley",
+        "player_id": "pfr_Ross_Dwelley",
+        "position": "TE",
+        "team": "DET",
         "predicted": 11.69583511352539,
         "confidence": 0.75
       },
@@ -3308,12 +3260,60 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Najee Harris",
-        "player_id": "pfr_Najee_Harris",
-        "position": "RB",
-        "team": "LAC",
-        "predicted": 11.598759651184082,
-        "confidence": 0.44999999999999996
+        "player_name": "John FitzPatrick",
+        "player_id": "pfr_John_FitzPatrick",
+        "position": "TE",
+        "team": "GB",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Brayden Willis",
+        "player_id": "pfr_Brayden_Willis",
+        "position": "TE",
+        "team": "SF",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Josh Whyle",
+        "player_id": "pfr_Josh_Whyle",
+        "position": "TE",
+        "team": "GB",
+        "predicted": 11.69583511352539,
+        "confidence": 0.6000000000000001
+      },
+      {
+        "player_name": "Zaire Mitchell-Paden",
+        "player_id": "pfr_Zaire_Mitchell-Paden",
+        "position": "TE",
+        "team": "2TM",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Durham Smythe",
+        "player_id": "pfr_Durham_Smythe",
+        "position": "TE",
+        "team": "CHI",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Quintin Morris",
+        "player_id": "pfr_Quintin_Morris",
+        "position": "TE",
+        "team": "JAX",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Blake Whiteheart",
+        "player_id": "pfr_Blake_Whiteheart",
+        "position": "TE",
+        "team": "CLE",
+        "predicted": 11.69583511352539,
+        "confidence": 0.75
       },
       {
         "player_name": "Raheem Mostert",
@@ -3322,6 +3322,14 @@
         "team": "LV",
         "predicted": 11.598759651184082,
         "confidence": 0.75
+      },
+      {
+        "player_name": "Najee Harris",
+        "player_id": "pfr_Najee_Harris",
+        "position": "RB",
+        "team": "LAC",
+        "predicted": 11.598759651184082,
+        "confidence": 0.44999999999999996
       },
       {
         "player_name": "Clyde Edwards-Helaire",
@@ -3356,18 +3364,18 @@
         "confidence": 0.44999999999999996
       },
       {
-        "player_name": "Kendre Miller",
-        "player_id": "pfr_Kendre_Miller",
-        "position": "RB",
-        "team": "NO",
-        "predicted": 11.389252662658691,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Will Shipley",
         "player_id": "pfr_Will_Shipley",
         "position": "RB",
         "team": "PHI",
+        "predicted": 11.389252662658691,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Hunter Luepke",
+        "player_id": "pfr_Hunter_Luepke",
+        "position": "RB",
+        "team": "DAL",
         "predicted": 11.389252662658691,
         "confidence": 0.75
       },
@@ -3380,19 +3388,59 @@
         "confidence": 0.6000000000000001
       },
       {
-        "player_name": "Hunter Luepke",
-        "player_id": "pfr_Hunter_Luepke",
-        "position": "RB",
-        "team": "DAL",
-        "predicted": 11.389252662658691,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Ameer Abdullah",
         "player_id": "pfr_Ameer_Abdullah",
         "position": "RB",
         "team": "IND",
         "predicted": 11.389252662658691,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Kendre Miller",
+        "player_id": "pfr_Kendre_Miller",
+        "position": "RB",
+        "team": "NO",
+        "predicted": 11.389252662658691,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Ray Davis",
+        "player_id": "pfr_Ray_Davis",
+        "position": "RB",
+        "team": "BUF",
+        "predicted": 11.31025218963623,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Cam Akers",
+        "player_id": "pfr_Cam_Akers",
+        "position": "RB",
+        "team": "MIN",
+        "predicted": 11.31025218963623,
+        "confidence": 0.44999999999999996
+      },
+      {
+        "player_name": "Amar Johnson",
+        "player_id": "pfr_Amar_Johnson",
+        "position": "RB",
+        "team": "LAC",
+        "predicted": 11.31025218963623,
+        "confidence": 0.30000000000000004
+      },
+      {
+        "player_name": "DJ Giddens",
+        "player_id": "pfr_DJ_Giddens",
+        "position": "RB",
+        "team": "IND",
+        "predicted": 11.31025218963623,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Julius Chestnut",
+        "player_id": "pfr_Julius_Chestnut",
+        "position": "RB",
+        "team": "TEN",
+        "predicted": 11.31025218963623,
         "confidence": 0.75
       },
       {
@@ -3404,68 +3452,12 @@
         "confidence": 0.30000000000000004
       },
       {
-        "player_name": "Julius Chestnut",
-        "player_id": "pfr_Julius_Chestnut",
-        "position": "RB",
-        "team": "TEN",
-        "predicted": 11.31025218963623,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "DJ Giddens",
-        "player_id": "pfr_DJ_Giddens",
-        "position": "RB",
-        "team": "IND",
-        "predicted": 11.31025218963623,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Jaydon Blue",
-        "player_id": "pfr_Jaydon_Blue",
-        "position": "RB",
-        "team": "DAL",
-        "predicted": 11.31025218963623,
-        "confidence": 0.6000000000000001
-      },
-      {
-        "player_name": "Amar Johnson",
-        "player_id": "pfr_Amar_Johnson",
-        "position": "RB",
-        "team": "LAC",
-        "predicted": 11.31025218963623,
-        "confidence": 0.30000000000000004
-      },
-      {
-        "player_name": "Cam Akers",
-        "player_id": "pfr_Cam_Akers",
-        "position": "RB",
-        "team": "MIN",
-        "predicted": 11.31025218963623,
-        "confidence": 0.44999999999999996
-      },
-      {
-        "player_name": "Tank Bigsby",
-        "player_id": "pfr_Tank_Bigsby",
-        "position": "RB",
-        "team": "PHI",
-        "predicted": 11.31025218963623,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Dameon Pierce",
         "player_id": "pfr_Dameon_Pierce",
         "position": "RB",
         "team": "HOU",
         "predicted": 11.31025218963623,
         "confidence": 0.6000000000000001
-      },
-      {
-        "player_name": "Ray Davis",
-        "player_id": "pfr_Ray_Davis",
-        "position": "RB",
-        "team": "BUF",
-        "predicted": 11.31025218963623,
-        "confidence": 0.75
       },
       {
         "player_name": "Tahj Brooks",
@@ -3476,18 +3468,18 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Rasheen Ali",
-        "player_id": "pfr_Rasheen_Ali",
+        "player_name": "Trevor Etienne",
+        "player_id": "pfr_Trevor_Etienne",
         "position": "RB",
-        "team": "BAL",
+        "team": "CAR",
         "predicted": 11.31025218963623,
         "confidence": 0.75
       },
       {
-        "player_name": "Antonio Gibson",
-        "player_id": "pfr_Antonio_Gibson",
+        "player_name": "George Holani",
+        "player_id": "pfr_George_Holani",
         "position": "RB",
-        "team": "NE",
+        "team": "SEA",
         "predicted": 11.31025218963623,
         "confidence": 0.75
       },
@@ -3508,36 +3500,28 @@
         "confidence": 0.44999999999999996
       },
       {
-        "player_name": "Trevor Etienne",
-        "player_id": "pfr_Trevor_Etienne",
-        "position": "RB",
-        "team": "CAR",
-        "predicted": 11.31025218963623,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "George Holani",
-        "player_id": "pfr_George_Holani",
-        "position": "RB",
-        "team": "SEA",
-        "predicted": 11.31025218963623,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Dylan Laube",
-        "player_id": "pfr_Dylan_Laube",
-        "position": "RB",
-        "team": "LV",
-        "predicted": 11.31025218963623,
-        "confidence": 0.75
-      },
-      {
         "player_name": "Terrell Jennings",
         "player_id": "pfr_Terrell_Jennings",
         "position": "RB",
         "team": "NE",
         "predicted": 11.31025218963623,
         "confidence": 0.75
+      },
+      {
+        "player_name": "Tank Bigsby",
+        "player_id": "pfr_Tank_Bigsby",
+        "position": "RB",
+        "team": "PHI",
+        "predicted": 11.31025218963623,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Jaydon Blue",
+        "player_id": "pfr_Jaydon_Blue",
+        "position": "RB",
+        "team": "DAL",
+        "predicted": 11.31025218963623,
+        "confidence": 0.6000000000000001
       },
       {
         "player_name": "Chris Rodriguez",
@@ -3548,18 +3532,10 @@
         "confidence": 0.75
       },
       {
-        "player_name": "Kaleb Johnson",
-        "player_id": "pfr_Kaleb_Johnson",
+        "player_name": "Rasheen Ali",
+        "player_id": "pfr_Rasheen_Ali",
         "position": "RB",
-        "team": "PIT",
-        "predicted": 11.31025218963623,
-        "confidence": 0.75
-      },
-      {
-        "player_name": "Tyler Goodson",
-        "player_id": "pfr_Tyler_Goodson",
-        "position": "RB",
-        "team": "IND",
+        "team": "BAL",
         "predicted": 11.31025218963623,
         "confidence": 0.75
       },
@@ -3572,6 +3548,38 @@
         "confidence": 0.75
       },
       {
+        "player_name": "Antonio Gibson",
+        "player_id": "pfr_Antonio_Gibson",
+        "position": "RB",
+        "team": "NE",
+        "predicted": 11.31025218963623,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Tyler Goodson",
+        "player_id": "pfr_Tyler_Goodson",
+        "position": "RB",
+        "team": "IND",
+        "predicted": 11.31025218963623,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Kaleb Johnson",
+        "player_id": "pfr_Kaleb_Johnson",
+        "position": "RB",
+        "team": "PIT",
+        "predicted": 11.31025218963623,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "Dylan Laube",
+        "player_id": "pfr_Dylan_Laube",
+        "position": "RB",
+        "team": "LV",
+        "predicted": 11.31025218963623,
+        "confidence": 0.75
+      },
+      {
         "player_name": "Dare Ogunbowale",
         "player_id": "pfr_Dare_Ogunbowale",
         "position": "RB",
@@ -3580,18 +3588,18 @@
         "confidence": 0.75
       },
       {
-        "player_name": "LeQuint Allen",
-        "player_id": "pfr_LeQuint_Allen",
-        "position": "RB",
-        "team": "JAX",
-        "predicted": 11.261245727539062,
-        "confidence": 0.75
-      },
-      {
         "player_name": "AJ Dillon",
         "player_id": "pfr_AJ_Dillon",
         "position": "RB",
         "team": "PHI",
+        "predicted": 11.261245727539062,
+        "confidence": 0.75
+      },
+      {
+        "player_name": "LeQuint Allen",
+        "player_id": "pfr_LeQuint_Allen",
+        "position": "RB",
+        "team": "JAX",
         "predicted": 11.261245727539062,
         "confidence": 0.75
       }
@@ -13469,9 +13477,9 @@
       ],
       "quality": {},
       "warnings": [],
-      "players": 448,
-      "predictions_generated": 448,
-      "avg_confidence": 0.7011160714285715
+      "players": 449,
+      "predictions_generated": 449,
+      "avg_confidence": 0.700890868596882
     },
     "rushing_yards": {
       "stat_type": "rushing_yards",

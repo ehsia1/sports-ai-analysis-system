@@ -25,8 +25,9 @@ class TestStageRegistry:
         assert "collect_odds" in stages
         assert "generate_predictions" in stages
         assert "calculate_edges" in stages
+        assert "refresh_schedule" in stages
         assert "score_results" in stages
-        assert len(stages) == 4
+        assert len(stages) == 5
 
     def test_get_stage_returns_instance(self):
         """Test that get_stage returns a stage instance."""

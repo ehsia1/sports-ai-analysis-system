@@ -268,13 +268,61 @@ pytest tests/test_edge_calculator.py -v
 
 ```
 1. Odds API → OddsSnapshot (database)
-2. NFL Data (nfl_data_py) → Feature Engineering
+2. NFL Data (nfl_data_py / NGS) → Feature Engineering
 3. Models (XGBoost) → Predictions (database + JSON)
 4. Predictions + Odds → Edges (database)
 5. Edges → Parlays (optional)
 6. Edges/Parlays → Discord notifications
 7. Post-game: Actual stats → Score predictions → Results
 ```
+
+## 2025 Season Data (NGS Fallback)
+
+**Problem**: `nfl_data_py.import_weekly_data([2025])` returns HTTP 404 because the yearly file isn't published until after the season ends.
+
+**Solution**: Use NGS (Next Gen Stats) data via `import_ngs_data()` for in-progress seasons.
+
+### Pattern Used Throughout Codebase
+
+```python
+def load_weekly_data(seasons: list) -> pd.DataFrame:
+    historical_seasons = [s for s in seasons if s < 2025]
+    include_2025 = 2025 in seasons
+
+    # Historical: standard weekly data
+    if historical_seasons:
+        df = nfl.import_weekly_data(historical_seasons)
+
+    # 2025: NGS data (rushing, receiving, passing merged)
+    if include_2025:
+        ngs_rush = nfl.import_ngs_data('rushing', [2025])
+        ngs_rec = nfl.import_ngs_data('receiving', [2025])
+        ngs_pass = nfl.import_ngs_data('passing', [2025])
+        # Filter week > 0, season_type == 'REG'
+        # Rename columns to match weekly_data format
+        # Merge all three stat types
+```
+
+### Files Using This Pattern
+- `src/sports_betting/ml/base_predictor.py`
+- `src/sports_betting/ml/feature_engineering.py`
+- `src/sports_betting/ml/data_sources.py`
+- `src/sports_betting/ml/stat_predictors.py`
+- `src/sports_betting/tracking/paper_trader.py`
+- `src/sports_betting/data/collectors/nfl_data.py`
+- `scripts/train_models_v2.py`
+- `scripts/train_multi_stat_models.py`
+
+### Key Column Mappings (NGS → Weekly)
+| NGS | Weekly Data |
+|-----|-------------|
+| `player_gsis_id` | `player_id` |
+| `team_abbr` | `recent_team` |
+| `rush_yards` | `rushing_yards` |
+| `yards` (receiving) | `receiving_yards` |
+| `pass_yards` | `passing_yards` |
+
+See `docs/NGS_DATA_2025.md` for full details.
 
 ## Environment Variables
 

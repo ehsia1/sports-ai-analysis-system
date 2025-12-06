@@ -503,12 +503,46 @@ class BetEvaluator:
         return week_df
 
     def _fetch_nflverse_stats(self, season: int, week: int) -> Optional['pd.DataFrame']:
-        """Fetch stats from nflverse/nfl_data_py."""
+        """Fetch stats from nflverse/nfl_data_py (using NGS for 2025)."""
         try:
             import nfl_data_py as nfl
 
             logger.info(f"Fetching nflverse stats for {season} week {week}")
-            weekly_df = nfl.import_weekly_data(years=[season])
+
+            # For 2025, use NGS data since yearly file isn't available mid-season
+            if season >= 2025:
+                ngs_rush = nfl.import_ngs_data('rushing', [season])
+                ngs_rec = nfl.import_ngs_data('receiving', [season])
+                ngs_pass = nfl.import_ngs_data('passing', [season])
+
+                # Filter to specific week
+                ngs_rush = ngs_rush[(ngs_rush['week'] == week) & (ngs_rush['season_type'] == 'REG')]
+                ngs_rec = ngs_rec[(ngs_rec['week'] == week) & (ngs_rec['season_type'] == 'REG')]
+                ngs_pass = ngs_pass[(ngs_pass['week'] == week) & (ngs_pass['season_type'] == 'REG')]
+
+                # Transform and merge
+                rush_df = ngs_rush.rename(columns={
+                    'player_gsis_id': 'player_id', 'team_abbr': 'recent_team',
+                    'rush_yards': 'rushing_yards', 'rush_attempts': 'carries',
+                })
+                rec_df = ngs_rec.rename(columns={
+                    'player_gsis_id': 'player_id', 'team_abbr': 'recent_team',
+                    'yards': 'receiving_yards',
+                })
+                pass_df = ngs_pass.rename(columns={
+                    'player_gsis_id': 'player_id', 'team_abbr': 'recent_team',
+                    'pass_yards': 'passing_yards',
+                })
+
+                weekly_df = rush_df.merge(
+                    rec_df, on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'], how='outer'
+                ).merge(
+                    pass_df, on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'], how='outer'
+                )
+                weekly_df['player_name'] = weekly_df['player_display_name']
+            else:
+                weekly_df = nfl.import_weekly_data(years=[season])
+
             week_df = weekly_df[weekly_df['week'] == week].copy()
 
             if not week_df.empty:

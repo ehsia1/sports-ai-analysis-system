@@ -24,12 +24,121 @@ import xgboost as xgb
 from sklearn.model_selection import train_test_split
 
 
+def load_ngs_2025_data() -> pd.DataFrame:
+    """Load 2025 season data from Next Gen Stats and transform to weekly_data format.
+
+    NGS provides weekly player stats for the current season before the yearly
+    data file is published by nfl_data_py.
+    """
+    print("Loading 2025 data from Next Gen Stats...")
+
+    try:
+        # Load NGS data for all stat types
+        ngs_rush = nfl.import_ngs_data('rushing', [2025])
+        ngs_rec = nfl.import_ngs_data('receiving', [2025])
+        ngs_pass = nfl.import_ngs_data('passing', [2025])
+
+        # Filter out season totals (week 0) and keep only regular season
+        ngs_rush = ngs_rush[(ngs_rush['week'] > 0) & (ngs_rush['season_type'] == 'REG')]
+        ngs_rec = ngs_rec[(ngs_rec['week'] > 0) & (ngs_rec['season_type'] == 'REG')]
+        ngs_pass = ngs_pass[(ngs_pass['week'] > 0) & (ngs_pass['season_type'] == 'REG')]
+
+        print(f"  NGS rushing records: {len(ngs_rush)}")
+        print(f"  NGS receiving records: {len(ngs_rec)}")
+        print(f"  NGS passing records: {len(ngs_pass)}")
+
+        # Transform rushing data to match weekly_data format
+        rush_df = ngs_rush.rename(columns={
+            'player_gsis_id': 'player_id',
+            'team_abbr': 'recent_team',
+            'rush_attempts': 'carries',
+            'rush_yards': 'rushing_yards',
+            'rush_touchdowns': 'rushing_tds',
+        })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+            'carries', 'rushing_yards', 'rushing_tds']].copy()
+
+        # Transform receiving data
+        rec_df = ngs_rec.rename(columns={
+            'player_gsis_id': 'player_id',
+            'team_abbr': 'recent_team',
+            'yards': 'receiving_yards',
+            'rec_touchdowns': 'receiving_tds',
+        })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+            'receptions', 'targets', 'receiving_yards', 'receiving_tds']].copy()
+
+        # Transform passing data
+        pass_df = ngs_pass.rename(columns={
+            'player_gsis_id': 'player_id',
+            'team_abbr': 'recent_team',
+            'pass_yards': 'passing_yards',
+            'pass_touchdowns': 'passing_tds',
+        })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+            'attempts', 'completions', 'passing_yards', 'passing_tds']].copy()
+
+        # Merge all stat types on player/week
+        # Start with rushing, merge receiving and passing
+        combined = rush_df.merge(
+            rec_df,
+            on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+            how='outer'
+        )
+        combined = combined.merge(
+            pass_df,
+            on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+            how='outer'
+        )
+
+        # Fill NaN stats with 0
+        stat_cols = ['carries', 'rushing_yards', 'rushing_tds', 'receptions', 'targets',
+                     'receiving_yards', 'receiving_tds', 'attempts', 'completions',
+                     'passing_yards', 'passing_tds']
+        combined[stat_cols] = combined[stat_cols].fillna(0)
+
+        # Add player_name column (same as player_display_name for NGS)
+        combined['player_name'] = combined['player_display_name']
+
+        # Add season_type column
+        combined['season_type'] = 'REG'
+
+        print(f"  Combined 2025 records: {len(combined)}")
+        print(f"  2025 weeks available: {sorted(combined['week'].unique())}")
+
+        return combined
+
+    except Exception as e:
+        print(f"  Warning: Could not load 2025 NGS data: {e}")
+        return pd.DataFrame()
+
+
 def load_data(seasons: list) -> tuple:
-    """Load weekly data, snap counts, and schedule (for weather)."""
+    """Load weekly data, snap counts, and schedule (for weather).
+
+    For 2025, uses NGS data since yearly file isn't published yet.
+    """
+    # Separate historical seasons from current (2025)
+    historical_seasons = [s for s in seasons if s < 2025]
+    include_2025 = 2025 in seasons
+
     print(f"Loading data for seasons {seasons}...")
 
-    weekly = nfl.import_weekly_data(seasons)
-    print(f"  Weekly records: {len(weekly)}")
+    # Load historical data
+    if historical_seasons:
+        weekly = nfl.import_weekly_data(historical_seasons)
+        print(f"  Historical weekly records (2020-2024): {len(weekly)}")
+    else:
+        weekly = pd.DataFrame()
+
+    # Load and append 2025 NGS data if requested
+    if include_2025:
+        ngs_2025 = load_ngs_2025_data()
+        if len(ngs_2025) > 0:
+            # Ensure column compatibility before concatenating
+            # Only keep columns that exist in historical data
+            if len(weekly) > 0:
+                common_cols = [c for c in ngs_2025.columns if c in weekly.columns]
+                ngs_2025 = ngs_2025[common_cols]
+            weekly = pd.concat([weekly, ngs_2025], ignore_index=True)
+            print(f"  Total weekly records (with 2025): {len(weekly)}")
 
     snaps = nfl.import_snap_counts(seasons)
     print(f"  Snap count records: {len(snaps)}")
@@ -827,7 +936,9 @@ def main():
     print("MODEL TRAINING V2 - Historical Features Only")
     print("="*60)
 
-    seasons = [2020, 2021, 2022, 2023, 2024]
+    # 2020-2024: Historical data from nfl_data_py
+    # 2025: Current season data from Next Gen Stats (NGS)
+    seasons = [2020, 2021, 2022, 2023, 2024, 2025]
     weekly, snaps, schedule = load_data(seasons)
 
     # Add snap counts

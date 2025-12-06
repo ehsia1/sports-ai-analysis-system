@@ -98,7 +98,7 @@ class AdaptiveDataFetcher:
         logger.info(f"Data availability checked: {self._data_availability}")
 
     def _check_weekly_data(self, year: int) -> bool:
-        """Check if weekly data is available for year."""
+        """Check if weekly data is available for year (using NGS for 2025)."""
         cache_file = self.cache_dir / f'weekly_avail_{year}.json'
 
         if cache_file.exists():
@@ -106,7 +106,12 @@ class AdaptiveDataFetcher:
                 return json.load(f).get('available', False)
 
         try:
-            df = nfl.import_weekly_data([year])
+            # For 2025, check NGS data instead (yearly file not available mid-season)
+            if year >= 2025:
+                df = nfl.import_ngs_data('receiving', [year])
+                df = df[(df['week'] > 0) & (df['season_type'] == 'REG')]
+            else:
+                df = nfl.import_weekly_data([year])
             available = len(df) > 0
 
             with open(cache_file, 'w') as f:
@@ -212,9 +217,25 @@ class AdaptiveDataFetcher:
         return df, source, quality
 
     def _fetch_weekly(self, season: int, week: Optional[int] = None) -> pd.DataFrame:
-        """Fetch weekly data from nfl_data_py."""
+        """Fetch weekly data from nfl_data_py (using NGS for 2025)."""
         logger.info(f"Loading weekly data for {season}")
-        df = nfl.import_weekly_data([season])
+
+        # For 2025, use NGS data since yearly file isn't available mid-season
+        if season >= 2025:
+            ngs_rec = nfl.import_ngs_data('receiving', [season])
+            ngs_rec = ngs_rec[(ngs_rec['week'] > 0) & (ngs_rec['season_type'] == 'REG')]
+
+            # Transform to weekly format
+            df = ngs_rec.rename(columns={
+                'player_gsis_id': 'player_id',
+                'team_abbr': 'recent_team',
+                'yards': 'receiving_yards',
+                'rec_touchdowns': 'receiving_tds',
+            })
+            df['player_name'] = df['player_display_name']
+            df['position'] = 'WR'  # NGS doesn't have position, default to WR for receivers
+        else:
+            df = nfl.import_weekly_data([season])
 
         # Filter to receivers
         df = df[df['position'].isin(['WR', 'TE', 'RB'])].copy()

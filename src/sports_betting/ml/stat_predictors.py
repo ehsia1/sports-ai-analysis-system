@@ -16,10 +16,108 @@ from .base_predictor import BaseStatPredictor
 logger = logging.getLogger(__name__)
 
 
+def load_weekly_data_with_ngs(seasons: List[int]) -> pd.DataFrame:
+    """Load weekly data, using NGS for 2025 since yearly file isn't available yet.
+
+    Args:
+        seasons: List of seasons to load
+
+    Returns:
+        DataFrame with weekly player stats
+    """
+    historical_seasons = [s for s in seasons if s < 2025]
+    include_2025 = 2025 in seasons
+
+    dfs = []
+
+    # Load historical data
+    if historical_seasons:
+        try:
+            weekly = nfl.import_weekly_data(years=historical_seasons)
+            dfs.append(weekly)
+        except Exception as e:
+            logger.warning(f"Could not load historical weekly data: {e}")
+
+    # Load 2025 from NGS
+    if include_2025:
+        try:
+            ngs_rush = nfl.import_ngs_data('rushing', [2025])
+            ngs_rec = nfl.import_ngs_data('receiving', [2025])
+            ngs_pass = nfl.import_ngs_data('passing', [2025])
+
+            # Filter out season totals (week 0)
+            ngs_rush = ngs_rush[(ngs_rush['week'] > 0) & (ngs_rush['season_type'] == 'REG')]
+            ngs_rec = ngs_rec[(ngs_rec['week'] > 0) & (ngs_rec['season_type'] == 'REG')]
+            ngs_pass = ngs_pass[(ngs_pass['week'] > 0) & (ngs_pass['season_type'] == 'REG')]
+
+            # Transform rushing
+            rush_df = ngs_rush.rename(columns={
+                'player_gsis_id': 'player_id',
+                'team_abbr': 'recent_team',
+                'rush_attempts': 'carries',
+                'rush_yards': 'rushing_yards',
+                'rush_touchdowns': 'rushing_tds',
+            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                'carries', 'rushing_yards', 'rushing_tds']].copy()
+
+            # Transform receiving
+            rec_df = ngs_rec.rename(columns={
+                'player_gsis_id': 'player_id',
+                'team_abbr': 'recent_team',
+                'yards': 'receiving_yards',
+                'rec_touchdowns': 'receiving_tds',
+            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                'receptions', 'targets', 'receiving_yards', 'receiving_tds']].copy()
+
+            # Transform passing
+            pass_df = ngs_pass.rename(columns={
+                'player_gsis_id': 'player_id',
+                'team_abbr': 'recent_team',
+                'pass_yards': 'passing_yards',
+                'pass_touchdowns': 'passing_tds',
+            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                'attempts', 'completions', 'passing_yards', 'passing_tds']].copy()
+
+            # Merge all stats
+            combined = rush_df.merge(
+                rec_df,
+                on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+                how='outer'
+            )
+            combined = combined.merge(
+                pass_df,
+                on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+                how='outer'
+            )
+
+            # Fill NaN stats with 0
+            stat_cols = ['carries', 'rushing_yards', 'rushing_tds', 'receptions', 'targets',
+                         'receiving_yards', 'receiving_tds', 'attempts', 'completions',
+                         'passing_yards', 'passing_tds']
+            for col in stat_cols:
+                if col in combined.columns:
+                    combined[col] = combined[col].fillna(0)
+
+            combined['player_name'] = combined['player_display_name']
+            combined['season_type'] = 'REG'
+
+            dfs.append(combined)
+            logger.info(f"Loaded {len(combined)} records from 2025 NGS data")
+
+        except Exception as e:
+            logger.warning(f"Could not load 2025 NGS data: {e}")
+
+    if dfs:
+        result = pd.concat(dfs, ignore_index=True)
+        return result
+    else:
+        return pd.DataFrame()
+
+
 def add_opponent_pass_defense(df: pd.DataFrame, seasons: List[int]) -> pd.DataFrame:
     """Add opponent pass defense features (yards allowed per game)."""
     try:
-        weekly = nfl.import_weekly_data(years=seasons)
+        weekly = load_weekly_data_with_ngs(seasons)
 
         # Calculate pass yards allowed by each team (group by opponent_team)
         # This gets how many yards each team GAVE UP each week

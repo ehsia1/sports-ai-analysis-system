@@ -74,11 +74,97 @@ class BaseStatPredictor(ABC):
         pass
 
     def load_weekly_data(self, seasons: List[int]) -> pd.DataFrame:
-        """Load weekly player data from nfl_data_py."""
+        """Load weekly player data from nfl_data_py, using NGS for 2025."""
         logger.info(f"Loading weekly data for seasons {seasons}")
-        weekly = nfl.import_weekly_data(seasons)
-        logger.info(f"  Loaded {len(weekly)} records")
-        return weekly
+
+        historical_seasons = [s for s in seasons if s < 2025]
+        include_2025 = 2025 in seasons
+        dfs = []
+
+        # Load historical data
+        if historical_seasons:
+            try:
+                weekly = nfl.import_weekly_data(historical_seasons)
+                dfs.append(weekly)
+                logger.info(f"  Loaded {len(weekly)} historical records")
+            except Exception as e:
+                logger.warning(f"Could not load historical weekly data: {e}")
+
+        # Load 2025 from NGS (yearly file not available mid-season)
+        if include_2025:
+            try:
+                ngs_rush = nfl.import_ngs_data('rushing', [2025])
+                ngs_rec = nfl.import_ngs_data('receiving', [2025])
+                ngs_pass = nfl.import_ngs_data('passing', [2025])
+
+                # Filter out season totals (week 0)
+                ngs_rush = ngs_rush[(ngs_rush['week'] > 0) & (ngs_rush['season_type'] == 'REG')]
+                ngs_rec = ngs_rec[(ngs_rec['week'] > 0) & (ngs_rec['season_type'] == 'REG')]
+                ngs_pass = ngs_pass[(ngs_pass['week'] > 0) & (ngs_pass['season_type'] == 'REG')]
+
+                # Transform rushing
+                rush_df = ngs_rush.rename(columns={
+                    'player_gsis_id': 'player_id',
+                    'team_abbr': 'recent_team',
+                    'rush_attempts': 'carries',
+                    'rush_yards': 'rushing_yards',
+                    'rush_touchdowns': 'rushing_tds',
+                })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                    'carries', 'rushing_yards', 'rushing_tds']].copy()
+
+                # Transform receiving
+                rec_df = ngs_rec.rename(columns={
+                    'player_gsis_id': 'player_id',
+                    'team_abbr': 'recent_team',
+                    'yards': 'receiving_yards',
+                    'rec_touchdowns': 'receiving_tds',
+                })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                    'receptions', 'targets', 'receiving_yards', 'receiving_tds']].copy()
+
+                # Transform passing
+                pass_df = ngs_pass.rename(columns={
+                    'player_gsis_id': 'player_id',
+                    'team_abbr': 'recent_team',
+                    'pass_yards': 'passing_yards',
+                    'pass_touchdowns': 'passing_tds',
+                })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                    'attempts', 'completions', 'passing_yards', 'passing_tds']].copy()
+
+                # Merge all stats
+                combined = rush_df.merge(
+                    rec_df,
+                    on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+                    how='outer'
+                )
+                combined = combined.merge(
+                    pass_df,
+                    on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+                    how='outer'
+                )
+
+                # Fill NaN stats with 0
+                stat_cols = ['carries', 'rushing_yards', 'rushing_tds', 'receptions', 'targets',
+                             'receiving_yards', 'receiving_tds', 'attempts', 'completions',
+                             'passing_yards', 'passing_tds']
+                for col in stat_cols:
+                    if col in combined.columns:
+                        combined[col] = combined[col].fillna(0)
+
+                combined['player_name'] = combined['player_display_name']
+                combined['season_type'] = 'REG'
+
+                dfs.append(combined)
+                logger.info(f"  Loaded {len(combined)} records from 2025 NGS data")
+
+            except Exception as e:
+                logger.warning(f"Could not load 2025 NGS data: {e}")
+
+        if dfs:
+            result = pd.concat(dfs, ignore_index=True)
+            logger.info(f"  Total: {len(result)} records")
+            return result
+        else:
+            return pd.DataFrame()
 
     def predict_for_week(
         self, season: int, week: int, seasons_for_history: Optional[List[int]] = None
@@ -98,10 +184,9 @@ class BaseStatPredictor(ABC):
 
         # Determine which seasons to load for historical data
         if seasons_for_history is None:
-            # Use last few seasons for feature building
-            current_year = 2024  # Last year with complete data
-            seasons_for_history = [2022, 2023, 2024]
-            if season <= current_year and season not in seasons_for_history:
+            # Use last few seasons for feature building (including 2025 via NGS)
+            seasons_for_history = [2022, 2023, 2024, 2025]
+            if season not in seasons_for_history:
                 seasons_for_history.append(season)
 
         # Load data

@@ -22,6 +22,59 @@ class NFLDataCollector:
         if datetime.now().month < 9:  # Before September
             self.current_season -= 1
 
+    def _load_weekly_data_with_ngs(self, year: int) -> pd.DataFrame:
+        """Load weekly data, using NGS for 2025+ since yearly file isn't available mid-season."""
+        if year >= 2025:
+            # Use NGS data for current season
+            ngs_rush = nfl.import_ngs_data('rushing', [year])
+            ngs_rec = nfl.import_ngs_data('receiving', [year])
+            ngs_pass = nfl.import_ngs_data('passing', [year])
+
+            # Filter out season totals (week 0)
+            ngs_rush = ngs_rush[(ngs_rush['week'] > 0) & (ngs_rush['season_type'] == 'REG')]
+            ngs_rec = ngs_rec[(ngs_rec['week'] > 0) & (ngs_rec['season_type'] == 'REG')]
+            ngs_pass = ngs_pass[(ngs_pass['week'] > 0) & (ngs_pass['season_type'] == 'REG')]
+
+            # Transform and merge
+            rush_df = ngs_rush.rename(columns={
+                'player_gsis_id': 'player_id', 'team_abbr': 'recent_team',
+                'rush_yards': 'rushing_yards', 'rush_attempts': 'carries',
+                'rush_touchdowns': 'rushing_tds',
+            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                'carries', 'rushing_yards', 'rushing_tds']].copy()
+
+            rec_df = ngs_rec.rename(columns={
+                'player_gsis_id': 'player_id', 'team_abbr': 'recent_team',
+                'yards': 'receiving_yards', 'rec_touchdowns': 'receiving_tds',
+            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                'receptions', 'targets', 'receiving_yards', 'receiving_tds']].copy()
+
+            pass_df = ngs_pass.rename(columns={
+                'player_gsis_id': 'player_id', 'team_abbr': 'recent_team',
+                'pass_yards': 'passing_yards', 'pass_touchdowns': 'passing_tds',
+            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                'attempts', 'completions', 'passing_yards', 'passing_tds']].copy()
+
+            combined = rush_df.merge(
+                rec_df, on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'], how='outer'
+            ).merge(
+                pass_df, on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'], how='outer'
+            )
+
+            # Fill NaN stats with 0
+            stat_cols = ['carries', 'rushing_yards', 'rushing_tds', 'receptions', 'targets',
+                         'receiving_yards', 'receiving_tds', 'attempts', 'completions',
+                         'passing_yards', 'passing_tds']
+            for col in stat_cols:
+                if col in combined.columns:
+                    combined[col] = combined[col].fillna(0)
+
+            combined['player_name'] = combined['player_display_name']
+            combined['season_type'] = 'REG'
+            return combined
+        else:
+            return nfl.import_weekly_data(years=[year])
+
     def collect_teams(self) -> int:
         """Collect and store NFL team data."""
         teams_df = nfl.import_team_desc()
@@ -74,23 +127,23 @@ class NFLDataCollector:
         return stored_count
 
     def collect_player_stats(self, years: List[int] = None, stat_type: str = "weekly") -> int:
-        """Collect and store player statistics."""
+        """Collect and store player statistics (using NGS for 2025)."""
         if years is None:
             years = [self.current_season]
 
         stored_count = 0
-        
+
         for year in years:
             if stat_type == "weekly":
-                stats_df = nfl.import_weekly_data(years=[year])
+                stats_df = self._load_weekly_data_with_ngs(year)
             elif stat_type == "seasonal":
                 stats_df = nfl.import_seasonal_data(years=[year])
             else:
                 raise ValueError(f"Invalid stat_type: {stat_type}")
-            
+
             with get_session() as session:
                 stored_count += self._store_player_stats(session, stats_df, year)
-        
+
         return stored_count
 
     def collect_rosters(self, years: List[int] = None) -> int:
@@ -134,10 +187,10 @@ class NFLDataCollector:
             return 0
 
     def get_team_stats(self, year: int, week: int = None) -> pd.DataFrame:
-        """Get team statistics for analysis."""
+        """Get team statistics for analysis (using NGS for 2025)."""
         if week:
             # Get weekly team stats up to specified week
-            weekly_df = nfl.import_weekly_data(years=[year])
+            weekly_df = self._load_weekly_data_with_ngs(year)
             team_stats = weekly_df[weekly_df['week'] <= week].groupby('recent_team').agg({
                 'passing_yards': 'mean',
                 'rushing_yards': 'mean',
@@ -151,16 +204,16 @@ class NFLDataCollector:
         else:
             # Get seasonal team stats
             team_stats = nfl.import_team_desc(years=[year])
-        
+
         return team_stats
 
     def get_player_weekly_stats(self, year: int, week: int = None) -> pd.DataFrame:
-        """Get player weekly statistics."""
-        weekly_df = nfl.import_weekly_data(years=[year])
-        
+        """Get player weekly statistics (using NGS for 2025)."""
+        weekly_df = self._load_weekly_data_with_ngs(year)
+
         if week:
             return weekly_df[weekly_df['week'] == week]
-        
+
         return weekly_df
 
     def get_advanced_stats(self, year: int) -> Dict[str, pd.DataFrame]:

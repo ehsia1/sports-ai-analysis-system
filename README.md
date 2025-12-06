@@ -302,9 +302,25 @@ python scripts/orchestrate.py health
 | Source | Data | Update Frequency |
 |--------|------|------------------|
 | nfl-data-py | Historical stats, weekly data | Weekly |
-| NFL Next Gen Stats | Advanced metrics | Weekly |
+| NFL Next Gen Stats | Advanced metrics, **2025 season data** | Weekly |
 | Pro Football Reference | Seasonal stats | Daily during season |
 | The Odds API | Live betting lines | Real-time |
+
+### 2025 Season Data
+
+The standard `nfl_data_py.import_weekly_data()` returns 404 for in-progress seasons because the yearly file isn't published until after the season ends. For the 2025 season, we use **NGS (Next Gen Stats)** data as a fallback:
+
+```python
+# Historical seasons: standard weekly data
+nfl.import_weekly_data([2020, 2021, 2022, 2023, 2024])
+
+# 2025 season: NGS data (rushing, receiving, passing)
+nfl.import_ngs_data('rushing', [2025])
+nfl.import_ngs_data('receiving', [2025])
+nfl.import_ngs_data('passing', [2025])
+```
+
+See [docs/NGS_DATA_2025.md](docs/NGS_DATA_2025.md) for full implementation details and column mappings.
 
 ## Limitations
 

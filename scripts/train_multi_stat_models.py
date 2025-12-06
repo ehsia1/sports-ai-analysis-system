@@ -68,11 +68,97 @@ STAT_CONFIGS = {
 
 
 def load_weekly_data(seasons: list) -> pd.DataFrame:
-    """Load weekly player data."""
+    """Load weekly player data, using NGS for 2025+ since yearly file isn't available mid-season."""
     print(f"Loading weekly data for {seasons}...")
-    weekly = nfl.import_weekly_data(seasons)
-    print(f"✓ Loaded {len(weekly)} records")
-    return weekly
+
+    historical_seasons = [s for s in seasons if s < 2025]
+    include_2025 = 2025 in seasons
+    dfs = []
+
+    # Load historical data
+    if historical_seasons:
+        try:
+            weekly = nfl.import_weekly_data(historical_seasons)
+            dfs.append(weekly)
+            print(f"  Historical records: {len(weekly)}")
+        except Exception as e:
+            print(f"  Warning: Could not load historical data: {e}")
+
+    # Load 2025 from NGS (yearly file not available mid-season)
+    if include_2025:
+        try:
+            ngs_rush = nfl.import_ngs_data('rushing', [2025])
+            ngs_rec = nfl.import_ngs_data('receiving', [2025])
+            ngs_pass = nfl.import_ngs_data('passing', [2025])
+
+            # Filter out season totals
+            ngs_rush = ngs_rush[(ngs_rush['week'] > 0) & (ngs_rush['season_type'] == 'REG')]
+            ngs_rec = ngs_rec[(ngs_rec['week'] > 0) & (ngs_rec['season_type'] == 'REG')]
+            ngs_pass = ngs_pass[(ngs_pass['week'] > 0) & (ngs_pass['season_type'] == 'REG')]
+
+            # Transform rushing
+            rush_df = ngs_rush.rename(columns={
+                'player_gsis_id': 'player_id',
+                'team_abbr': 'recent_team',
+                'rush_attempts': 'carries',
+                'rush_yards': 'rushing_yards',
+                'rush_touchdowns': 'rushing_tds',
+            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                'carries', 'rushing_yards', 'rushing_tds']].copy()
+
+            # Transform receiving
+            rec_df = ngs_rec.rename(columns={
+                'player_gsis_id': 'player_id',
+                'team_abbr': 'recent_team',
+                'yards': 'receiving_yards',
+                'rec_touchdowns': 'receiving_tds',
+            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                'receptions', 'targets', 'receiving_yards', 'receiving_tds']].copy()
+
+            # Transform passing
+            pass_df = ngs_pass.rename(columns={
+                'player_gsis_id': 'player_id',
+                'team_abbr': 'recent_team',
+                'pass_yards': 'passing_yards',
+                'pass_touchdowns': 'passing_tds',
+            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+                'attempts', 'completions', 'passing_yards', 'passing_tds']].copy()
+
+            # Merge all stats
+            combined = rush_df.merge(
+                rec_df,
+                on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+                how='outer'
+            )
+            combined = combined.merge(
+                pass_df,
+                on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+                how='outer'
+            )
+
+            # Fill NaN stats with 0
+            stat_cols = ['carries', 'rushing_yards', 'rushing_tds', 'receptions', 'targets',
+                         'receiving_yards', 'receiving_tds', 'attempts', 'completions',
+                         'passing_yards', 'passing_tds']
+            for col in stat_cols:
+                if col in combined.columns:
+                    combined[col] = combined[col].fillna(0)
+
+            combined['player_name'] = combined['player_display_name']
+            combined['season_type'] = 'REG'
+
+            dfs.append(combined)
+            print(f"  2025 NGS records: {len(combined)}")
+
+        except Exception as e:
+            print(f"  Warning: Could not load 2025 NGS data: {e}")
+
+    if dfs:
+        result = pd.concat(dfs, ignore_index=True)
+        print(f"✓ Total: {len(result)} records")
+        return result
+    else:
+        return pd.DataFrame()
 
 
 def load_snap_counts(seasons: list) -> pd.DataFrame:

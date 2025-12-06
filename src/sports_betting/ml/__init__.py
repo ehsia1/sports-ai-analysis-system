@@ -16,9 +16,11 @@ from .context import SituationalContext, get_context, set_qb_change, set_injury
 from .base_predictor import BaseStatPredictor
 from .stat_predictors import (
     RushingYardsPredictor,
+    RushingYardsPredictorV3,
     PassingYardsPredictor,
     PassingYardsPredictorV3,
     ReceptionsPredictor,
+    ReceptionsPredictorV3,
     PREDICTOR_REGISTRY,
     get_predictor,
     list_predictors,
@@ -31,9 +33,11 @@ __all__ = [
     # Multi-stat predictors
     'BaseStatPredictor',
     'RushingYardsPredictor',
+    'RushingYardsPredictorV3',
     'PassingYardsPredictor',
     'PassingYardsPredictorV3',
     'ReceptionsPredictor',
+    'ReceptionsPredictorV3',
     'PREDICTOR_REGISTRY',
     'get_predictor',
     'list_predictors',

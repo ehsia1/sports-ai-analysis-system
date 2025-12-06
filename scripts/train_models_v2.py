@@ -448,6 +448,303 @@ def build_receptions_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def build_rushing_features_v3(df: pd.DataFrame, schedule: pd.DataFrame, seasons: list) -> pd.DataFrame:
+    """Build enhanced features for rushing yards V3 prediction.
+
+    Adds:
+    - Opponent rush defense metrics
+    - Vegas implied totals (low totals favor rushing)
+    - Weather interaction features (cold/wet favors rushing)
+    - NGS rushing metrics
+    """
+    print("\nBuilding rushing yards V3 features...")
+
+    # Start with base V2 features
+    df = build_rushing_features(df)
+
+    # === OPPONENT RUSH DEFENSE ===
+    print("  Adding opponent rush defense metrics...")
+
+    # Calculate team rush defense (yards allowed per game)
+    team_rush_allowed = df.groupby(['season', 'week', 'recent_team']).agg({
+        'rushing_yards': 'sum'
+    }).reset_index()
+    team_rush_allowed = team_rush_allowed.rename(columns={
+        'recent_team': 'defense_team',
+        'rushing_yards': 'rush_yards_allowed'
+    })
+
+    # Calculate rolling average of yards allowed (shifted to avoid leakage)
+    team_rush_allowed = team_rush_allowed.sort_values(['defense_team', 'season', 'week'])
+    team_rush_allowed['opp_rush_yards_allowed_avg'] = team_rush_allowed.groupby('defense_team')['rush_yards_allowed'].transform(
+        lambda x: x.shift(1).rolling(5, min_periods=1).mean()
+    )
+
+    # Get opponent info from schedule
+    sched_games = schedule[['season', 'week', 'home_team', 'away_team']].copy()
+
+    # Create opponent lookup
+    home_opp = sched_games.rename(columns={'home_team': 'recent_team', 'away_team': 'opponent'})
+    away_opp = sched_games.rename(columns={'away_team': 'recent_team', 'home_team': 'opponent'})
+    opp_lookup = pd.concat([
+        home_opp[['season', 'week', 'recent_team', 'opponent']],
+        away_opp[['season', 'week', 'recent_team', 'opponent']]
+    ]).drop_duplicates()
+
+    # Merge opponent info
+    df = df.merge(opp_lookup, on=['season', 'week', 'recent_team'], how='left')
+
+    # Merge opponent defense stats
+    opp_defense = team_rush_allowed[['season', 'week', 'defense_team', 'opp_rush_yards_allowed_avg']].copy()
+    opp_defense = opp_defense.rename(columns={'defense_team': 'opponent'})
+    df = df.merge(opp_defense, on=['season', 'week', 'opponent'], how='left')
+
+    # Fill missing with league average
+    league_avg_allowed = df['opp_rush_yards_allowed_avg'].mean()
+    df['opp_rush_yards_allowed_avg'] = df['opp_rush_yards_allowed_avg'].fillna(league_avg_allowed if not pd.isna(league_avg_allowed) else 115.0)
+
+    # Normalize defense strength (higher = easier opponent)
+    df['opp_rush_defense_strength'] = df['opp_rush_yards_allowed_avg'] / 115.0  # 115 = league avg
+
+    # === VEGAS IMPLIED TOTALS ===
+    print("  Adding Vegas implied totals...")
+
+    if 'total' in schedule.columns:
+        vegas_cols = ['season', 'week', 'home_team', 'away_team', 'total']
+        sched_vegas = schedule[vegas_cols].copy()
+
+        home_vegas = sched_vegas.rename(columns={'home_team': 'recent_team'})
+        away_vegas = sched_vegas.rename(columns={'away_team': 'recent_team'})
+        vegas_lookup = pd.concat([
+            home_vegas[['season', 'week', 'recent_team', 'total']],
+            away_vegas[['season', 'week', 'recent_team', 'total']]
+        ]).drop_duplicates()
+
+        df = df.merge(vegas_lookup, on=['season', 'week', 'recent_team'], how='left')
+        df = df.rename(columns={'total': 'vegas_total'})
+    else:
+        df['vegas_total'] = 45.0
+
+    df['vegas_total'] = df['vegas_total'].fillna(45.0)
+    df['vegas_total_normalized'] = df['vegas_total'] / 45.0
+    # Low totals favor rushing (opposite of passing)
+    df['is_low_total'] = (df['vegas_total'] < 42).astype(int)
+
+    # === NGS RUSHING METRICS ===
+    print("  Adding NGS rushing metrics...")
+
+    try:
+        ngs_rush = nfl.import_ngs_data(stat_type='rushing', years=seasons)
+        if len(ngs_rush) > 0:
+            ngs_cols = ['season', 'week', 'player_display_name', 'avg_rush_yards',
+                       'efficiency', 'rush_yards_over_expected_per_att', 'percent_attempts_gte_eight_defenders']
+            ngs_rush = ngs_rush[[c for c in ngs_cols if c in ngs_rush.columns]].copy()
+
+            ngs_rush = ngs_rush.rename(columns={
+                'player_display_name': 'player_name',
+                'avg_rush_yards': 'ngs_avg_rush_yards',
+                'efficiency': 'ngs_efficiency',
+                'rush_yards_over_expected_per_att': 'ngs_ryoe',
+                'percent_attempts_gte_eight_defenders': 'ngs_stacked_box_pct'
+            })
+
+            # Rolling averages (shifted)
+            ngs_rush = ngs_rush.sort_values(['player_name', 'season', 'week'])
+            for col in ['ngs_avg_rush_yards', 'ngs_efficiency', 'ngs_ryoe', 'ngs_stacked_box_pct']:
+                if col in ngs_rush.columns:
+                    ngs_rush[col] = ngs_rush.groupby('player_name')[col].transform(
+                        lambda x: x.shift(1).rolling(3, min_periods=1).mean()
+                    )
+
+            df = df.merge(ngs_rush, on=['season', 'week', 'player_name'], how='left')
+    except Exception as e:
+        print(f"    Warning: Could not load NGS rushing data: {e}")
+
+    # Fill NGS features with defaults
+    df['ngs_avg_rush_yards'] = df.get('ngs_avg_rush_yards', pd.Series([4.5] * len(df))).fillna(4.5)
+    df['ngs_efficiency'] = df.get('ngs_efficiency', pd.Series([50.0] * len(df))).fillna(50.0)
+    df['ngs_ryoe'] = df.get('ngs_ryoe', pd.Series([0.0] * len(df))).fillna(0.0)
+    df['ngs_stacked_box_pct'] = df.get('ngs_stacked_box_pct', pd.Series([25.0] * len(df))).fillna(25.0)
+
+    # === WEATHER INTERACTION FEATURES ===
+    print("  Adding weather interaction features...")
+
+    # Cold weather favors rushing (opposite of passing)
+    df['cold_game'] = (df['is_cold'] == 1).astype(int)
+    df['cold_and_windy'] = ((df['is_cold'] == 1) & (df['is_windy'] == 1)).astype(int)
+
+    # Rush-friendly weather score (higher = more favorable for rushing)
+    # Cold and windy = good for rushing, dome = neutral
+    df['rush_weather_score'] = (
+        df['is_cold'].astype(float) * 0.3 +
+        df['is_windy'].astype(float) * 0.3 +
+        (1 - df['is_dome'].astype(float)) * 0.2 +
+        df['cold_and_windy'].astype(float) * 0.2
+    )
+
+    # Rush environment score (combine defense + low total + weather)
+    df['rush_environment_score'] = (
+        df['opp_rush_defense_strength'] * 0.4 +
+        (1 - df['vegas_total_normalized']) * 0.3 +  # Lower total = better for rushing
+        df['rush_weather_score'] * 0.3
+    )
+
+    print(f"  V3 features built. Records: {len(df)}")
+    print(f"  Opponent defense coverage: {df['opp_rush_yards_allowed_avg'].notna().mean()*100:.1f}%")
+    print(f"  Vegas total coverage: {(df['vegas_total'] != 45.0).mean()*100:.1f}%")
+
+    return df
+
+
+def build_receptions_features_v3(df: pd.DataFrame, schedule: pd.DataFrame, seasons: list) -> pd.DataFrame:
+    """Build enhanced features for receptions V3 prediction.
+
+    Adds:
+    - Opponent pass defense metrics
+    - Vegas implied totals (high totals = more passing)
+    - Weather interaction features
+    - NGS receiving metrics
+    """
+    print("\nBuilding receptions V3 features...")
+
+    # Start with base V2 features
+    df = build_receptions_features(df)
+
+    # === OPPONENT PASS DEFENSE ===
+    print("  Adding opponent pass defense metrics...")
+
+    # Calculate team targets allowed per game (proxy for pass defense)
+    team_targets_allowed = df.groupby(['season', 'week', 'recent_team']).agg({
+        'targets': 'sum',
+        'receptions': 'sum'
+    }).reset_index()
+    team_targets_allowed = team_targets_allowed.rename(columns={
+        'recent_team': 'defense_team',
+        'targets': 'targets_allowed',
+        'receptions': 'receptions_allowed'
+    })
+
+    # Rolling averages (shifted)
+    team_targets_allowed = team_targets_allowed.sort_values(['defense_team', 'season', 'week'])
+    team_targets_allowed['opp_targets_allowed_avg'] = team_targets_allowed.groupby('defense_team')['targets_allowed'].transform(
+        lambda x: x.shift(1).rolling(5, min_periods=1).mean()
+    )
+    team_targets_allowed['opp_receptions_allowed_avg'] = team_targets_allowed.groupby('defense_team')['receptions_allowed'].transform(
+        lambda x: x.shift(1).rolling(5, min_periods=1).mean()
+    )
+
+    # Get opponent info from schedule
+    sched_games = schedule[['season', 'week', 'home_team', 'away_team']].copy()
+
+    home_opp = sched_games.rename(columns={'home_team': 'recent_team', 'away_team': 'opponent'})
+    away_opp = sched_games.rename(columns={'away_team': 'recent_team', 'home_team': 'opponent'})
+    opp_lookup = pd.concat([
+        home_opp[['season', 'week', 'recent_team', 'opponent']],
+        away_opp[['season', 'week', 'recent_team', 'opponent']]
+    ]).drop_duplicates()
+
+    df = df.merge(opp_lookup, on=['season', 'week', 'recent_team'], how='left')
+
+    # Merge opponent defense stats
+    opp_defense = team_targets_allowed[['season', 'week', 'defense_team', 'opp_targets_allowed_avg', 'opp_receptions_allowed_avg']].copy()
+    opp_defense = opp_defense.rename(columns={'defense_team': 'opponent'})
+    df = df.merge(opp_defense, on=['season', 'week', 'opponent'], how='left')
+
+    # Fill with league averages
+    df['opp_targets_allowed_avg'] = df['opp_targets_allowed_avg'].fillna(35.0)  # ~35 targets per game
+    df['opp_receptions_allowed_avg'] = df['opp_receptions_allowed_avg'].fillna(22.0)  # ~22 receptions per game
+
+    # Normalize defense strength (higher = easier opponent)
+    df['opp_target_defense_strength'] = df['opp_targets_allowed_avg'] / 35.0
+    df['opp_reception_defense_strength'] = df['opp_receptions_allowed_avg'] / 22.0
+
+    # === VEGAS IMPLIED TOTALS ===
+    print("  Adding Vegas implied totals...")
+
+    if 'total' in schedule.columns:
+        vegas_cols = ['season', 'week', 'home_team', 'away_team', 'total']
+        sched_vegas = schedule[vegas_cols].copy()
+
+        home_vegas = sched_vegas.rename(columns={'home_team': 'recent_team'})
+        away_vegas = sched_vegas.rename(columns={'away_team': 'recent_team'})
+        vegas_lookup = pd.concat([
+            home_vegas[['season', 'week', 'recent_team', 'total']],
+            away_vegas[['season', 'week', 'recent_team', 'total']]
+        ]).drop_duplicates()
+
+        df = df.merge(vegas_lookup, on=['season', 'week', 'recent_team'], how='left')
+        df = df.rename(columns={'total': 'vegas_total'})
+    else:
+        df['vegas_total'] = 45.0
+
+    df['vegas_total'] = df['vegas_total'].fillna(45.0)
+    df['vegas_total_normalized'] = df['vegas_total'] / 45.0
+    df['is_high_total'] = (df['vegas_total'] > 48).astype(int)
+
+    # === NGS RECEIVING METRICS ===
+    print("  Adding NGS receiving metrics...")
+
+    try:
+        ngs_rec = nfl.import_ngs_data(stat_type='receiving', years=seasons)
+        if len(ngs_rec) > 0:
+            ngs_cols = ['season', 'week', 'player_display_name', 'avg_separation',
+                       'avg_cushion', 'avg_intended_air_yards', 'catch_percentage']
+            ngs_rec = ngs_rec[[c for c in ngs_cols if c in ngs_rec.columns]].copy()
+
+            ngs_rec = ngs_rec.rename(columns={
+                'player_display_name': 'player_name',
+                'avg_separation': 'ngs_separation',
+                'avg_cushion': 'ngs_cushion',
+                'avg_intended_air_yards': 'ngs_air_yards',
+                'catch_percentage': 'ngs_catch_pct'
+            })
+
+            # Rolling averages (shifted)
+            ngs_rec = ngs_rec.sort_values(['player_name', 'season', 'week'])
+            for col in ['ngs_separation', 'ngs_cushion', 'ngs_air_yards', 'ngs_catch_pct']:
+                if col in ngs_rec.columns:
+                    ngs_rec[col] = ngs_rec.groupby('player_name')[col].transform(
+                        lambda x: x.shift(1).rolling(3, min_periods=1).mean()
+                    )
+
+            df = df.merge(ngs_rec, on=['season', 'week', 'player_name'], how='left')
+    except Exception as e:
+        print(f"    Warning: Could not load NGS receiving data: {e}")
+
+    # Fill NGS features with defaults
+    df['ngs_separation'] = df.get('ngs_separation', pd.Series([2.5] * len(df))).fillna(2.5)
+    df['ngs_cushion'] = df.get('ngs_cushion', pd.Series([6.0] * len(df))).fillna(6.0)
+    df['ngs_air_yards'] = df.get('ngs_air_yards', pd.Series([8.0] * len(df))).fillna(8.0)
+    df['ngs_catch_pct'] = df.get('ngs_catch_pct', pd.Series([65.0] * len(df))).fillna(65.0)
+
+    # === WEATHER INTERACTION FEATURES ===
+    print("  Adding weather interaction features...")
+
+    # Bad weather hurts passing/receiving
+    df['cold_and_windy'] = ((df['is_cold'] == 1) & (df['is_windy'] == 1)).astype(int)
+
+    # Weather impact (higher = worse for receiving)
+    df['weather_impact'] = (
+        df['is_cold'].astype(float) * 0.25 +
+        df['is_windy'].astype(float) * 0.4 +
+        df['cold_and_windy'].astype(float) * 0.15 +
+        (1 - df['is_dome'].astype(float)) * 0.2
+    )
+
+    # Reception environment score
+    df['reception_environment_score'] = (
+        df['opp_reception_defense_strength'] * 0.35 +
+        df['vegas_total_normalized'] * 0.35 +
+        (1 - df['weather_impact']) * 0.3
+    )
+
+    print(f"  V3 features built. Records: {len(df)}")
+    print(f"  Opponent defense coverage: {df['opp_targets_allowed_avg'].notna().mean()*100:.1f}%")
+    print(f"  Vegas total coverage: {(df['vegas_total'] != 45.0).mean()*100:.1f}%")
+
+    return df
+
+
 def train_model(df: pd.DataFrame, target_col: str, features: list, name: str) -> dict:
     """Train XGBoost model."""
     print(f"\n{'='*60}")
@@ -541,7 +838,7 @@ def main():
 
     results = {}
 
-    # === RUSHING YARDS ===
+    # === RUSHING YARDS V2 ===
     rush_df = build_rushing_features(weekly.copy())
     rush_features = [
         'rush_yards_last_3', 'rush_yards_last_5',
@@ -554,6 +851,29 @@ def main():
     rush_model = train_model(rush_df, 'rushing_yards', rush_features, 'rushing_yards')
     save_model(rush_model, 'rushing_yards')
     results['rushing_yards'] = rush_model['metrics']
+
+    # === RUSHING YARDS V3 (Enhanced) ===
+    rush_df_v3 = build_rushing_features_v3(weekly.copy(), schedule, seasons)
+    rush_features_v3 = [
+        # Base V2 features
+        'rush_yards_last_3', 'rush_yards_last_5',
+        'rush_yards_std_3', 'rush_yards_std_5',
+        'carries_last_3', 'carries_last_5',
+        'ypc_career', 'position_encoded', 'week_num', 'snap_pct',
+        # Weather features
+        'is_dome', 'game_temp', 'is_cold',
+        # NEW: Opponent defense
+        'opp_rush_yards_allowed_avg', 'opp_rush_defense_strength',
+        # NEW: Vegas implied totals
+        'vegas_total', 'vegas_total_normalized', 'is_low_total',
+        # NEW: NGS metrics
+        'ngs_avg_rush_yards', 'ngs_efficiency', 'ngs_ryoe', 'ngs_stacked_box_pct',
+        # NEW: Weather interactions
+        'cold_game', 'cold_and_windy', 'rush_weather_score', 'rush_environment_score',
+    ]
+    rush_model_v3 = train_model(rush_df_v3, 'rushing_yards', rush_features_v3, 'rushing_yards_v3')
+    save_model(rush_model_v3, 'rushing_yards', version='v3')
+    results['rushing_yards_v3'] = rush_model_v3['metrics']
 
     # === PASSING YARDS V2 ===
     pass_df = build_passing_features(weekly.copy())
@@ -592,7 +912,7 @@ def main():
     save_model(pass_model_v3, 'passing_yards', version='v3')
     results['passing_yards_v3'] = pass_model_v3['metrics']
 
-    # === RECEPTIONS ===
+    # === RECEPTIONS V2 ===
     rec_df = build_receptions_features(weekly.copy())
     rec_features = [
         'receptions_last_3', 'receptions_last_5',
@@ -606,6 +926,31 @@ def main():
     rec_model = train_model(rec_df, 'receptions', rec_features, 'receptions')
     save_model(rec_model, 'receptions')
     results['receptions'] = rec_model['metrics']
+
+    # === RECEPTIONS V3 (Enhanced) ===
+    rec_df_v3 = build_receptions_features_v3(weekly.copy(), schedule, seasons)
+    rec_features_v3 = [
+        # Base V2 features
+        'receptions_last_3', 'receptions_last_5',
+        'receptions_std_3', 'receptions_std_5',
+        'targets_last_3', 'targets_last_5',
+        'target_share_last_3', 'target_share_last_5',
+        'catch_rate_last_5', 'position_encoded', 'week_num', 'snap_pct',
+        # Weather features
+        'is_dome', 'game_temp', 'game_wind', 'is_cold', 'is_windy',
+        # NEW: Opponent defense
+        'opp_targets_allowed_avg', 'opp_receptions_allowed_avg',
+        'opp_target_defense_strength', 'opp_reception_defense_strength',
+        # NEW: Vegas implied totals
+        'vegas_total', 'vegas_total_normalized', 'is_high_total',
+        # NEW: NGS metrics
+        'ngs_separation', 'ngs_cushion', 'ngs_air_yards', 'ngs_catch_pct',
+        # NEW: Weather interactions
+        'cold_and_windy', 'weather_impact', 'reception_environment_score',
+    ]
+    rec_model_v3 = train_model(rec_df_v3, 'receptions', rec_features_v3, 'receptions_v3')
+    save_model(rec_model_v3, 'receptions', version='v3')
+    results['receptions_v3'] = rec_model_v3['metrics']
 
     # Summary
     print("\n" + "="*60)

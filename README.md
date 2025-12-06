@@ -231,7 +231,7 @@ sports-betting/
 │   └── orchestrate.py         # Main CLI entry point
 ├── models/                    # Saved model files (.pkl)
 ├── data/                      # SQLite database
-└── tests/                     # 100 tests
+└── tests/                     # 174 tests
 ```
 
 ## Model Training
@@ -287,7 +287,7 @@ After running predictions, reports are saved to `docs/`:
 ## Development
 
 ```bash
-# Run tests (100 tests)
+# Run tests (174 tests)
 pytest tests/
 
 # Train models with fresh data

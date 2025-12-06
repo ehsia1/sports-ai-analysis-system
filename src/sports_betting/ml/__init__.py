@@ -17,6 +17,7 @@ from .base_predictor import BaseStatPredictor
 from .stat_predictors import (
     RushingYardsPredictor,
     PassingYardsPredictor,
+    PassingYardsPredictorV3,
     ReceptionsPredictor,
     PREDICTOR_REGISTRY,
     get_predictor,
@@ -31,6 +32,7 @@ __all__ = [
     'BaseStatPredictor',
     'RushingYardsPredictor',
     'PassingYardsPredictor',
+    'PassingYardsPredictorV3',
     'ReceptionsPredictor',
     'PREDICTOR_REGISTRY',
     'get_predictor',

@@ -1,0 +1,34 @@
+services:
+  betting:
+    build: .
+    container_name: nfl-betting
+    volumes:
+      # Persist database
+      - ./data:/app/data
+      # Persist model files
+      - ./models:/app/models
+      # Config cache
+      - betting-cache:/root/.sports_betting
+    environment:
+      - ODDS_API_KEY=${ODDS_API_KEY}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - DATABASE_URL=sqlite:///data/sports_betting.db
+      - LOG_LEVEL=INFO
+    env_file:
+      - .env
+
+  # Scheduled runner (optional)
+  scheduler:
+    build: .
+    container_name: nfl-betting-scheduler
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - betting-cache:/root/.sports_betting
+    env_file:
+      - .env
+    command: python scripts/scheduler.py
+    restart: unless-stopped
+
+volumes:
+  betting-cache:

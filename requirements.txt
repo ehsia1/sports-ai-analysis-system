@@ -28,6 +28,10 @@ pydantic>=2.3.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
 pyyaml>=6.0
+loguru>=0.7.0
+
+# Scheduling
+apscheduler>=3.10.0
 
 # Visualization
 plotly>=5.15.0

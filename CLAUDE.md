@@ -2,15 +2,15 @@
 
 ## Current Season Context
 
-**Last Updated**: 2025-12-05
+**Last Updated**: 2026-02-05
 
 | Field | Value |
 |-------|-------|
 | NFL Season | 2024-2025 (referred to as "2025 season") |
-| Current Week | Week 14 |
-| Season Status | Regular season in progress |
+| Current Week | Week 22 (Super Bowl) |
+| Season Status | Super Bowl week - season ending |
 
-> **Note**: Update this section when the week changes. The system uses `--season 2025` for current season data.
+> **Note**: The 2025 season is complete through Conference Championship (Week 21). Models have been trained with full regular season + playoff data. Ready for 2026 season.
 
 ## Virtual Environment
 

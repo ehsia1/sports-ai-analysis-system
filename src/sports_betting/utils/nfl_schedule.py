@@ -108,7 +108,7 @@ class NFLSchedule:
                     session.query(Game)
                     .filter(
                         Game.season == season,
-                        Game.season_type == "REG",
+                        Game.season_type.in_(["REG", "POST"]),
                         Game.game_date >= window_start,
                         Game.game_date <= window_end,
                     )
@@ -122,7 +122,7 @@ class NFLSchedule:
                 # No games in window - check if we're before or after season
                 first_game = (
                     session.query(Game)
-                    .filter(Game.season == season, Game.season_type == "REG")
+                    .filter(Game.season == season, Game.season_type.in_(["REG", "POST"]))
                     .order_by(Game.game_date)
                     .first()
                 )
@@ -131,12 +131,12 @@ class NFLSchedule:
                     # Before season starts
                     return season, 1
 
-                # Find the last completed week
+                # Find the last completed week (including playoffs)
                 last_completed = (
                     session.query(Game.week)
                     .filter(
                         Game.season == season,
-                        Game.season_type == "REG",
+                        Game.season_type.in_(["REG", "POST"]),
                         Game.is_completed == True,
                     )
                     .order_by(Game.week.desc())
@@ -158,7 +158,8 @@ class NFLSchedule:
 
                     if incomplete_in_week == 0:
                         # All games done - we're in post-game or next week
-                        next_week = min(week + 1, 18)
+                        # Cap at week 22 (Super Bowl) for playoffs
+                        next_week = min(week + 1, 22)
                         return season, next_week
 
                     return season, week

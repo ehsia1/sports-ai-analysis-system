@@ -3,6 +3,11 @@
 Runs pre-game, post-game, and health check workflows on a cron schedule.
 Uses APScheduler with timezone-aware cron triggers.
 
+Features:
+- Persistent job store (SQLite) - survives restarts
+- Misfire grace time (4 hours) - runs missed jobs when Mac wakes
+- Coalesce - combines multiple missed runs into one
+
 Usage:
     docker compose up -d scheduler
     docker compose logs -f scheduler
@@ -10,11 +15,22 @@ Usage:
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 import subprocess
 from loguru import logger
 
+# Persistent job store + misfire handling
+jobstores = {
+    "default": SQLAlchemyJobStore(url="sqlite:///data/scheduler_jobs.db")
+}
 
-scheduler = BlockingScheduler()
+job_defaults = {
+    "coalesce": True,  # Combine missed runs into one
+    "max_instances": 1,  # Only one instance of each job at a time
+    "misfire_grace_time": 4 * 60 * 60,  # 4 hours - run if missed within this window
+}
+
+scheduler = BlockingScheduler(jobstores=jobstores, job_defaults=job_defaults)
 
 
 def run_command(cmd: list[str]) -> None:

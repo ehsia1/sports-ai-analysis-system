@@ -91,10 +91,10 @@ def load_weekly_data(seasons: list) -> pd.DataFrame:
             ngs_rec = nfl.import_ngs_data('receiving', [2025])
             ngs_pass = nfl.import_ngs_data('passing', [2025])
 
-            # Filter out season totals
-            ngs_rush = ngs_rush[(ngs_rush['week'] > 0) & (ngs_rush['season_type'] == 'REG')]
-            ngs_rec = ngs_rec[(ngs_rec['week'] > 0) & (ngs_rec['season_type'] == 'REG')]
-            ngs_pass = ngs_pass[(ngs_pass['week'] > 0) & (ngs_pass['season_type'] == 'REG')]
+            # Filter out season totals, include both regular season and playoffs
+            ngs_rush = ngs_rush[(ngs_rush['week'] > 0) & (ngs_rush['season_type'].isin(['REG', 'POST']))]
+            ngs_rec = ngs_rec[(ngs_rec['week'] > 0) & (ngs_rec['season_type'].isin(['REG', 'POST']))]
+            ngs_pass = ngs_pass[(ngs_pass['week'] > 0) & (ngs_pass['season_type'].isin(['REG', 'POST']))]
 
             # Transform rushing
             rush_df = ngs_rush.rename(columns={
@@ -103,7 +103,7 @@ def load_weekly_data(seasons: list) -> pd.DataFrame:
                 'rush_attempts': 'carries',
                 'rush_yards': 'rushing_yards',
                 'rush_touchdowns': 'rushing_tds',
-            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+            })[['season', 'week', 'season_type', 'player_id', 'player_display_name', 'recent_team',
                 'carries', 'rushing_yards', 'rushing_tds']].copy()
 
             # Transform receiving
@@ -112,7 +112,7 @@ def load_weekly_data(seasons: list) -> pd.DataFrame:
                 'team_abbr': 'recent_team',
                 'yards': 'receiving_yards',
                 'rec_touchdowns': 'receiving_tds',
-            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+            })[['season', 'week', 'season_type', 'player_id', 'player_display_name', 'recent_team',
                 'receptions', 'targets', 'receiving_yards', 'receiving_tds']].copy()
 
             # Transform passing
@@ -121,18 +121,18 @@ def load_weekly_data(seasons: list) -> pd.DataFrame:
                 'team_abbr': 'recent_team',
                 'pass_yards': 'passing_yards',
                 'pass_touchdowns': 'passing_tds',
-            })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+            })[['season', 'week', 'season_type', 'player_id', 'player_display_name', 'recent_team',
                 'attempts', 'completions', 'passing_yards', 'passing_tds']].copy()
 
             # Merge all stats
             combined = rush_df.merge(
                 rec_df,
-                on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+                on=['season', 'week', 'season_type', 'player_id', 'player_display_name', 'recent_team'],
                 how='outer'
             )
             combined = combined.merge(
                 pass_df,
-                on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+                on=['season', 'week', 'season_type', 'player_id', 'player_display_name', 'recent_team'],
                 how='outer'
             )
 
@@ -145,7 +145,6 @@ def load_weekly_data(seasons: list) -> pd.DataFrame:
                     combined[col] = combined[col].fillna(0)
 
             combined['player_name'] = combined['player_display_name']
-            combined['season_type'] = 'REG'
 
             dfs.append(combined)
             print(f"  2025 NGS records: {len(combined)}")
@@ -446,7 +445,7 @@ def main():
     print("="*60)
 
     # Configuration
-    train_seasons = [2020, 2021, 2022, 2023, 2024]
+    train_seasons = [2020, 2021, 2022, 2023, 2024, 2025]
     stat_types = ['receiving_yards', 'rushing_yards', 'passing_yards', 'receptions']
 
     # Load data once

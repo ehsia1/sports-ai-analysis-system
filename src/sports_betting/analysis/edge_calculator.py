@@ -378,11 +378,11 @@ class EdgeCalculator:
         week_matchups = matchup_service.get_week_matchups(season, week)
 
         with get_session() as session:
-            # Get all games for this week
-            games = session.query(Game).filter_by(
-                season=season,
-                week=week,
-                season_type='REG'
+            # Get all games for this week (regular season and playoffs)
+            games = session.query(Game).filter(
+                Game.season == season,
+                Game.week == week,
+                Game.season_type.in_(['REG', 'POST'])
             ).all()
 
             for game in games:

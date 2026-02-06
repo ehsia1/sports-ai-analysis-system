@@ -38,10 +38,10 @@ def load_ngs_2025_data() -> pd.DataFrame:
         ngs_rec = nfl.import_ngs_data('receiving', [2025])
         ngs_pass = nfl.import_ngs_data('passing', [2025])
 
-        # Filter out season totals (week 0) and keep only regular season
-        ngs_rush = ngs_rush[(ngs_rush['week'] > 0) & (ngs_rush['season_type'] == 'REG')]
-        ngs_rec = ngs_rec[(ngs_rec['week'] > 0) & (ngs_rec['season_type'] == 'REG')]
-        ngs_pass = ngs_pass[(ngs_pass['week'] > 0) & (ngs_pass['season_type'] == 'REG')]
+        # Filter out season totals (week 0), include both regular season and playoffs
+        ngs_rush = ngs_rush[(ngs_rush['week'] > 0) & (ngs_rush['season_type'].isin(['REG', 'POST']))]
+        ngs_rec = ngs_rec[(ngs_rec['week'] > 0) & (ngs_rec['season_type'].isin(['REG', 'POST']))]
+        ngs_pass = ngs_pass[(ngs_pass['week'] > 0) & (ngs_pass['season_type'].isin(['REG', 'POST']))]
 
         print(f"  NGS rushing records: {len(ngs_rush)}")
         print(f"  NGS receiving records: {len(ngs_rec)}")
@@ -54,7 +54,7 @@ def load_ngs_2025_data() -> pd.DataFrame:
             'rush_attempts': 'carries',
             'rush_yards': 'rushing_yards',
             'rush_touchdowns': 'rushing_tds',
-        })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+        })[['season', 'week', 'season_type', 'player_id', 'player_display_name', 'recent_team',
             'carries', 'rushing_yards', 'rushing_tds']].copy()
 
         # Transform receiving data
@@ -63,7 +63,7 @@ def load_ngs_2025_data() -> pd.DataFrame:
             'team_abbr': 'recent_team',
             'yards': 'receiving_yards',
             'rec_touchdowns': 'receiving_tds',
-        })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+        })[['season', 'week', 'season_type', 'player_id', 'player_display_name', 'recent_team',
             'receptions', 'targets', 'receiving_yards', 'receiving_tds']].copy()
 
         # Transform passing data
@@ -72,19 +72,19 @@ def load_ngs_2025_data() -> pd.DataFrame:
             'team_abbr': 'recent_team',
             'pass_yards': 'passing_yards',
             'pass_touchdowns': 'passing_tds',
-        })[['season', 'week', 'player_id', 'player_display_name', 'recent_team',
+        })[['season', 'week', 'season_type', 'player_id', 'player_display_name', 'recent_team',
             'attempts', 'completions', 'passing_yards', 'passing_tds']].copy()
 
         # Merge all stat types on player/week
         # Start with rushing, merge receiving and passing
         combined = rush_df.merge(
             rec_df,
-            on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+            on=['season', 'week', 'season_type', 'player_id', 'player_display_name', 'recent_team'],
             how='outer'
         )
         combined = combined.merge(
             pass_df,
-            on=['season', 'week', 'player_id', 'player_display_name', 'recent_team'],
+            on=['season', 'week', 'season_type', 'player_id', 'player_display_name', 'recent_team'],
             how='outer'
         )
 
@@ -97,11 +97,9 @@ def load_ngs_2025_data() -> pd.DataFrame:
         # Add player_name column (same as player_display_name for NGS)
         combined['player_name'] = combined['player_display_name']
 
-        # Add season_type column
-        combined['season_type'] = 'REG'
-
         print(f"  Combined 2025 records: {len(combined)}")
         print(f"  2025 weeks available: {sorted(combined['week'].unique())}")
+        print(f"  Season types: {combined['season_type'].value_counts().to_dict()}")
 
         return combined
 
